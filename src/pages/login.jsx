@@ -87,6 +87,12 @@ function Login() {
     <main id="login" style={{ textAlign: 'center' }}>
       <form onSubmit={onSubmit}>
         <h1>Log in</h1>
+        <p>
+          You can use any Mastodon instance domain, but if you're not sure use{' '}
+          <a onClick={() => setInstanceText('social.boom.army')}>
+            social.boom.army
+          </a>
+        </p>
         <label>
           <p>Instance</p>
           <input
@@ -107,7 +113,7 @@ function Login() {
               setInstanceText(e.target.value);
             }}
           />
-          <ul id="instances-suggestions">
+          {/* <ul id="instances-suggestions">
             {instancesList
               .filter((instance) => instance.includes(instanceText))
               .slice(0, 10)
@@ -124,7 +130,7 @@ function Login() {
                   </button>
                 </li>
               ))}
-          </ul>
+          </ul> */}
           {/* <datalist id="instances-list">
             {instancesList.map((instance) => (
               <option value={instance} />
@@ -136,6 +142,7 @@ function Login() {
             Failed to log in. Please try again or another instance.
           </p>
         )}
+        <br />
         <div>
           <button class="large" disabled={uiState === 'loading'}>
             Log in
@@ -144,7 +151,7 @@ function Login() {
         <Loader hidden={uiState !== 'loading'} />
         <hr />
         <p>
-          <a href="https://joinmastodon.org/servers" target="_blank">
+          <a href="https://social.boom.army/auth/sign_up" target="_blank">
             Don't have an account? Create one!
           </a>
         </p>
