@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css?family=Noto+Sans:300,400,600,800&subset=latin,latin-ext");
+
 /* Can't use this yet because custom-media doesn't propagate to other CSS files yet, in Vite */
 @custom-media --viewport-medium (min-width: 40em);
 
@@ -110,7 +112,7 @@ html {
 }
 
 body {
-  font-family: ui-rounded, system-ui;
+  font-family: 'Noto Sans', 'Trebuchet MS', 'Arial', sans-serif;
   font-size: var(--text-size);
   word-wrap: break-word;
   overflow-wrap: break-word;

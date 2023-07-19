@@ -914,7 +914,7 @@ function Compose({
                 ? 'Post your reply'
                 : editStatus
                 ? 'Edit your post'
-                : 'What are you doing?'
+                : 'It\'s happening...'
             }
             required={mediaAttachments?.length === 0}
             disabled={uiState === 'loading'}
