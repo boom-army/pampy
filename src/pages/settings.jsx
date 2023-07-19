@@ -404,7 +404,7 @@ function Settings({ onClose }) {
                 @phanpy
               </a>
               <br />
-              <a href="https://github.com/cheeaun/phanpy" target="_blank">
+              <a href="https://github.com/boom-army/pampy" target="_blank">
                 Built
               </a>{' '}
               by{' '}
@@ -422,7 +422,7 @@ function Settings({ onClose }) {
           </div>
           <p>
             <a
-              href="https://github.com/cheeaun/phanpy/blob/main/PRIVACY.MD"
+              href="https://github.com/boom-army/pampy/blob/main/PRIVACY.MD"
               target="_blank"
             >
               Privacy Policy
@@ -436,7 +436,7 @@ function Settings({ onClose }) {
                 <>
                   (
                   <a
-                    href={`https://github.com/cheeaun/phanpy/commit/${__COMMIT_HASH__}`}
+                    href={`https://github.com/boom-army/pampy/commit/${__COMMIT_HASH__}`}
                     target="_blank"
                   >
                     <code>{__COMMIT_HASH__}</code>

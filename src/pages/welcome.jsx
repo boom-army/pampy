@@ -99,7 +99,7 @@ function Welcome() {
       </div>
       <hr />
       <p>
-        <a href="https://github.com/cheeaun/phanpy" target="_blank">
+        <a href="https://github.com/boom-army/pampy" target="_blank">
           Built
         </a>{' '}
         by{' '}
@@ -115,7 +115,7 @@ function Welcome() {
         </a>
         .{' '}
         <a
-          href="https://github.com/cheeaun/phanpy/blob/main/PRIVACY.MD"
+          href="https://github.com/boom-army/pampy/blob/main/PRIVACY.MD"
           target="_blank"
         >
           Privacy Policy
