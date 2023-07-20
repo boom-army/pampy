@@ -392,16 +392,16 @@ function Settings({ onClose }) {
               }}
             />
             <div>
-              <b>Phanpy</b>{' '}
+              <b>Boom</b>{' '}
               <a
-                href="https://hachyderm.io/@phanpy"
+                href="https://boom.army"
                 // target="_blank"
                 onClick={(e) => {
                   e.preventDefault();
-                  states.showAccount = 'phanpy@hachyderm.io';
+                  states.showAccount = 'harkl@social.boom.army';
                 }}
               >
-                @phanpy
+                @harkl
               </a>
               <br />
               <a href="https://github.com/boom-army/pampy" target="_blank">
@@ -409,14 +409,14 @@ function Settings({ onClose }) {
               </a>{' '}
               by{' '}
               <a
-                href="https://mastodon.social/@cheeaun"
+                href="https://social.boom.army/@harkl"
                 // target="_blank"
                 onClick={(e) => {
                   e.preventDefault();
-                  states.showAccount = 'cheeaun@mastodon.social';
+                  states.showAccount = 'harkl@social.boom.army';
                 }}
               >
-                @cheeaun
+                @harkl
               </a>
             </div>
           </div>

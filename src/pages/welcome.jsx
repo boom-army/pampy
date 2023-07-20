@@ -27,7 +27,7 @@ function Welcome() {
               marginBlockEnd: -16,
             }}
           />
-          <img src={logoText} alt="Phanpy" width="250" />
+          <img src={logoText} alt="Boom" width="250" />
         </h1>
         <p>
           <big>
@@ -104,14 +104,14 @@ function Welcome() {
         </a>{' '}
         by{' '}
         <a
-          href="https://mastodon.social/@cheeaun"
+          href="https://social.boom.army/@harkl"
           target="_blank"
           onClick={(e) => {
             e.preventDefault();
-            states.showAccount = 'cheeaun@mastodon.social';
+            states.showAccount = 'harkl@social.boom.army';
           }}
         >
-          @cheeaun
+          @harkl
         </a>
         .{' '}
         <a
