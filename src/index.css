@@ -33,7 +33,7 @@
   --link-visited-color: mediumslateblue;
   --focus-ring-color: var(--link-color);
   --button-bg-color: var(--pink-color);
-  --button-bg-blur-color: #4169e1aa;
+  --button-bg-blur-color: #ff006299;
   --button-text-color: white;
   --button-plain-bg-hover-color: rgba(128, 128, 128, 0.1);
   --reblog-color: var(--purple-color);
@@ -57,6 +57,15 @@
   --close-button-hover-color: rgba(0, 0, 0, 1);
 
   --timing-function: cubic-bezier(0.3, 0.5, 0, 1);
+
+  --yellow-stripes: repeating-linear-gradient(
+    -45deg,
+    var(--reply-to-faded-color),
+    var(--reply-to-faded-color) 10px,
+    var(--reply-to-faded-color) 10px,
+    transparent 10px,
+    transparent 20px
+  );
 }
 
 @media (min-resolution: 2dppx) {
@@ -71,8 +80,8 @@
     --purple-color: #b190f1;
     --green-color: lightgreen;
     --orange-color: orange;
-    --bg-color: #242526;
-    --bg-faded-color: #15202b;
+    --bg-color: #13202d;
+    --bg-faded-color: #171f27;
     --bg-blur-color: #0009;
     --bg-faded-blur-color: #18191a99;
     --text-color: #f0f2f5;

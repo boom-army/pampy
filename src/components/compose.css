@@ -277,17 +277,8 @@
   background-color: var(--bg-color);
 }
 
-#compose-container .form-visibility-direct {
-  --yellow-stripes: repeating-linear-gradient(
-    -45deg,
-    var(--reply-to-faded-color),
-    var(--reply-to-faded-color) 10px,
-    var(--reply-to-faded-color) 10px,
-    transparent 10px,
-    transparent 20px
-  );
-  /* diagonal stripes of yellow */
-  background-image: var(--yellow-stripes);
+#compose-container .form-visibility-direct textarea {
+  border-color: var(--pink-color);
 }
 
 #compose-container .media-attachments {

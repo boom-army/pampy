@@ -22,16 +22,7 @@
   );
 }
 .visibility-direct {
-  --yellow-stripes: repeating-linear-gradient(
-    -45deg,
-    var(--reply-to-faded-color),
-    var(--reply-to-faded-color) 10px,
-    var(--reply-to-faded-color) 10px,
-    transparent 10px,
-    transparent 20px
-  );
-  /* diagonal stripes of yellow */
-  background-image: var(--yellow-stripes);
+  border-left: 5px solid var(--reply-to-text-color);
 }
 
 /* STATUS PRE META */
@@ -72,9 +63,6 @@
   );
   padding-bottom: 8px;
   background-image: var(--fade-in-out-bg);
-}
-.status.large.visibility-direct {
-  background-image: var(--fade-in-out-bg), var(--yellow-stripes);
 }
 
 .status-card-link {
