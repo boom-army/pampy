@@ -902,8 +902,9 @@ function Status({
                     // Higher than the backdrop
                     zIndex: 1001,
                   },
-                  onClick: () => {
-                    menuInstanceRef.current?.closeMenu?.();
+                  onClick: (e) => {
+                    if (e.target === e.currentTarget)
+                      menuInstanceRef.current?.closeMenu?.();
                   },
                 }}
                 align="end"
@@ -1835,7 +1836,12 @@ function _unfurlMastodonLink(instance, url) {
   console.debug('🦦 Unfurling URL', url);
 
   let remoteInstanceFetch;
-  const urlObj = new URL(url);
+  let theURL = url;
+  if (/\/\/elk\.[^\/]+\/[^.]+\.[^.]+/i.test(theURL)) {
+    // E.g. https://elk.zone/domain.com/@stest/123 -> https://domain.com/@stest/123
+    theURL = theURL.replace(/elk\.[^\/]+\//i, '');
+  }
+  const urlObj = new URL(theURL);
   const domain = urlObj.hostname;
   const path = urlObj.pathname;
   // Regex /:username/:id, where username = @username or @username@domain, id = number
@@ -1879,12 +1885,12 @@ function _unfurlMastodonLink(instance, url) {
   function handleFulfill(result) {
     const { status, instance } = result;
     const { id } = status;
-    const url = `/${instance}/s/${id}`;
-    console.debug('🦦 Unfurled URL', url, id, url);
+    const selfURL = `/${instance}/s/${id}`;
+    console.debug('🦦 Unfurled URL', url, id, selfURL);
     const data = {
       id,
       instance,
-      url,
+      url: selfURL,
     };
     states.unfurledLinks[url] = data;
     saveStatus(status, instance, {
