@@ -38,7 +38,7 @@ function Welcome() {
             </b>
           </big>
         </p>
-        <p class="desc">Decentralized Social Media built on Solana</p>
+        <p class="desc">Decentralized Social Media for Solana Blockchain</p>
       </div>
       <div id="why-container">
         <div class="sections">
