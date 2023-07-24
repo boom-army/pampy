@@ -57,7 +57,7 @@ export default defineConfig({
         id: CLIENT_ID,
         name: CLIENT_NAME,
         short_name: CLIENT_NAME,
-        description: 'Minimalistic opinionated Mastodon web client',
+        description: 'Decentralized Social Media for Solana Blockchain',
         theme_color: '#ffffff',
         icons: [
           {
