@@ -88,7 +88,7 @@ function Login() {
       <form onSubmit={onSubmit}>
         <h1>Log in</h1>
         <p>
-          You can use any Mastodon instance domain, but if you're not sure use{' '}
+          You can use any Mastodon instance domain, but if you're not sure, sign up and use{' '}
           <a onClick={() => setInstanceText('social.boom.army')}>
             social.boom.army
           </a>
