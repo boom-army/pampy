@@ -136,6 +136,7 @@ function Status({
       username,
       emojis: accountEmojis,
       bot,
+      group,
     },
     id,
     repliesCount,
@@ -230,6 +231,25 @@ function Status({
 
   if (reblog) {
     // If has statusID, means useItemID (cached in states)
+
+    if (group) {
+      return (
+        <div class="status-group" onMouseEnter={debugHover}>
+          <div class="status-pre-meta">
+            <Icon icon="group" size="l" alt="Group" />{' '}
+            <NameText account={status.account} instance={instance} showAvatar />
+          </div>
+          <Status
+            status={statusID ? null : reblog}
+            statusID={statusID ? reblog.id : null}
+            instance={instance}
+            size={size}
+            contentTextWeight={contentTextWeight}
+          />
+        </div>
+      );
+    }
+
     return (
       <div class="status-reblog" onMouseEnter={debugHover}>
         <div class="status-pre-meta">
@@ -848,10 +868,12 @@ function Status({
           state={isContextMenuOpen ? 'open' : undefined}
           anchorPoint={contextMenuAnchorPoint}
           direction="right"
-          onClose={() => {
+          onClose={(e) => {
             setIsContextMenuOpen(false);
             // statusRef.current?.focus?.();
-            statusRef.current?.closest('[tabindex]')?.focus?.();
+            if (e?.reason === 'click') {
+              statusRef.current?.closest('[tabindex]')?.focus?.();
+            }
           }}
           portal={{
             target: document.body,
@@ -1449,7 +1471,7 @@ function Card({ card, instance }) {
 
   if (snapStates.unfurledLinks[url]) return null;
 
-  if (hasText && (image || (!type !== 'photo' && blurhash))) {
+  if (hasText && (image || (type === 'photo' && blurhash))) {
     const domain = new URL(url).hostname.replace(/^www\./, '');
     let blurhashImage;
     if (!image) {
@@ -1541,7 +1563,9 @@ function Card({ card, instance }) {
         class={`card link no-image`}
       >
         <div class="meta-container">
-          <p class="meta domain">{domain}</p>
+          <p class="meta domain">
+            <Icon icon="link" size="s" /> <span>{domain}</span>
+          </p>
           <p class="title">{title}</p>
           <p class="meta">{description || providerName || authorName}</p>
         </div>
@@ -1972,7 +1996,7 @@ const unfurlMastodonLink = throttle(
 
 function FilteredStatus({ status, filterInfo, instance, containerProps = {} }) {
   const {
-    account: { avatar, avatarStatic, bot },
+    account: { avatar, avatarStatic, bot, group },
     createdAt,
     visibility,
     reblog,
@@ -1997,7 +2021,7 @@ function FilteredStatus({ status, filterInfo, instance, containerProps = {} }) {
 
   return (
     <div
-      class={isReblog ? 'status-reblog' : ''}
+      class={isReblog ? (group ? 'status-group' : 'status-reblog') : ''}
       {...containerProps}
       title={statusPeekText}
       onContextMenu={(e) => {
