@@ -6,7 +6,7 @@ if [ "$CONT" = "y" ]; then
     aws s3 rm s3://boom.army --recursive
     aws s3 sync ./dist s3://boom.army
     cp .env.dev .env
-    aws cloudfront create-invalidation --distribution-id E3ULLSCY1L385R --paths "/*"
+    aws cloudfront create-invalidation --distribution-id E2MLQ0CMSO3EFB --paths "/*"
 else
     echo "Phew! Dodged a bullet.";
 fi
