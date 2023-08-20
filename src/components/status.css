@@ -471,7 +471,10 @@
   overflow: hidden;
   position: relative;
 }
-.timeline-deck .status-reblog .status .content {
+.timeline-deck
+  .status-reblog:not(.status-carousel .status-reblog)
+  .status
+  .content {
   /* Deprioritise long-form boosts */
   max-height: 40vh;
   max-height: 40dvh;
@@ -509,6 +512,16 @@
 }
 .timeline-deck .status .content.truncated ~ .card {
   display: none;
+}
+.status .content .inner-content a:not(.mention, .has-url-text) {
+  color: var(--link-text-color);
+}
+.status
+  .content
+  .inner-content
+  a:not(.mention, .has-url-text):is(:hover, :focus) {
+  color: var(--text-color);
+  text-decoration-color: var(--link-color);
 }
 .status .content p {
   /* 12px = 75% of 16px */
@@ -735,7 +748,8 @@ body:has(#modal-container .carousel) .status .media img:hover {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: calc(var(--media-radius) - var(--media-border-width));
+  /* border-radius: calc(var(--media-radius) - var(--media-border-width)); */
+  border-radius: inherit;
 }
 .status :is(.media-video, .media-audio, .media-gif) {
   position: relative;
@@ -743,15 +757,16 @@ body:has(#modal-container .carousel) .status .media img:hover {
 }
 .status :is(.media-video, .media-audio)[data-formatted-duration] .media-play {
   pointer-events: none;
-  width: 70px;
-  height: 70px;
+  width: 44px;
+  height: 44px;
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  color: var(--text-insignificant-color);
-  background-color: var(--bg-faded-blur-color);
-  backdrop-filter: blur(6px) saturate(3) invert(0.2);
+  color: var(--text-color);
+  background-color: var(--bg-blur-color);
+  /* backdrop-filter: blur(6px) saturate(3) invert(0.2); */
+  box-shadow: 0 0 16px var(--drop-shadow-color);
   display: flex;
   place-content: center;
   place-items: center;
@@ -759,10 +774,12 @@ body:has(#modal-container .carousel) .status .media img:hover {
   transition: all 0.2s ease-in-out;
 }
 .status
-  :is(.media-video, .media-audio)[data-formatted-duration]:hover
+  :is(.media-video, .media-audio)[data-formatted-duration]:hover:not(:active)
   .media-play {
-  color: var(--text-color);
-  background-color: var(--bg-blur-color);
+  transform: translate(-50%, -50%) scale(1.1);
+  background-color: var(--bg-color);
+  box-shadow: 0 0 16px var(--drop-shadow-color),
+    0 0 8px var(--drop-shadow-color);
 }
 .status :is(.media-video, .media-audio)[data-formatted-duration]:after {
   font-size: 12px;
@@ -862,8 +879,8 @@ body:has(#modal-container .carousel) .status .media img:hover {
   border-radius: 8px;
   color: var(--text-color);
   padding: 4px 8px;
-  background-color: var(--bg-blur-color);
-  border: var(--hairline-width) solid var(--bg-blur-color);
+  background-color: var(--bg-faded-color);
+  border: 1px solid var(--outline-color);
   box-shadow: 0 4px 16px var(--drop-shadow-color);
   max-width: min(var(--main-width), calc(100% - 32px));
   display: flex;

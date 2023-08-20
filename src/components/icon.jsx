@@ -8,7 +8,7 @@ const SIZES = {
   xxl: 32,
 };
 
-const ICONS = {
+export const ICONS = {
   x: () => import('@iconify-icons/mingcute/close-line'),
   heart: () => import('@iconify-icons/mingcute/heart-line'),
   bookmark: () => import('@iconify-icons/mingcute/bookmark-line'),
@@ -90,6 +90,11 @@ const ICONS = {
   announce: () => import('@iconify-icons/mingcute/announcement-line'),
   alert: () => import('@iconify-icons/mingcute/alert-line'),
   round: () => import('@iconify-icons/mingcute/round-fill'),
+  'arrow-up-circle': () =>
+    import('@iconify-icons/mingcute/arrow-up-circle-line'),
+  'arrow-down-circle': () =>
+    import('@iconify-icons/mingcute/arrow-down-circle-line'),
+  clipboard: () => import('@iconify-icons/mingcute/clipboard-line'),
 };
 
 function Icon({

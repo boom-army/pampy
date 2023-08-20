@@ -1097,6 +1097,21 @@ a[href^='http'][rel*='nofollow']:visited:not(:has(div)) {
 button.carousel-dot {
   pointer-events: auto;
   font-weight: bold;
+  color: var(--text-color);
+  background-color: var(--bg-faded-blur-color);
+  border: var(--hairline-width) solid var(--outline-color);
+  box-shadow: 0 4px 32px var(--drop-shadow-color);
+  transition: all 0.2s ease-out;
+}
+button.carousel-dot {
+  background-color: transparent;
+}
+.carousel-controls :is(.button, button).carousel-button {
+  background-color: var(--bg-blur-color);
+}
+.carousel-controls
+  :is(.button, button).carousel-button:is(:hover, :focus):not(:active) {
+  background-color: var(--bg-color);
 }
 .carousel-top-controls .szh-menu-container {
   pointer-events: auto;
@@ -1108,10 +1123,15 @@ button.carousel-dot {
 }
 .carousel-dots {
   border-radius: 999px;
-  backdrop-filter: blur(12px) invert(0.25);
+  background-color: var(--bg-faded-blur-color);
+  border: 1px solid var(--outline-color);
+  box-shadow: 0 4px 32px var(--drop-shadow-color);
+  /* backdrop-filter: blur(12px) invert(0.25); */
 }
 button.carousel-dot {
   backdrop-filter: none !important;
+  border: none;
+  box-shadow: none;
 }
 button.carousel-dot[disabled] {
   pointer-events: none;
@@ -1142,6 +1162,14 @@ button.carousel-dot:is(.active, [disabled].active) .icon {
     transform: scale(0);
     /* transition: transform 0.2s ease-in-out; */
   }
+  .carousel-controls
+    :is(.button, button).carousel-button:is(:hover, :focus):not(:active) {
+    transform: scale(1.2);
+  }
+  .carousel-controls :is(.button, button).carousel-button:active {
+    transition-duration: 0s;
+  }
+
   :is(.carousel-top-controls, .carousel-controls)[hidden] {
     opacity: 1;
   }
@@ -1388,6 +1416,11 @@ body:has(.media-modal-container + .status-deck) .media-post-link {
 }
 .tag.collapsed {
   margin: 0;
+}
+.tag.insignificant {
+  border: 1px solid var(--outline-color);
+  color: var(--text-insignificant-color);
+  background-color: var(--bg-faded-color);
 }
 .tag.danger {
   background-color: var(--red-color);
@@ -1641,27 +1674,35 @@ meter.donut::-moz-meter-bar {
 
 meter.donut {
   position: relative;
-  width: 24px;
-  height: 24px;
+  --dimension: 24px;
+  --border-width: 2px;
+  --middle-circle-radius: calc(var(--dimension) / 2 - var(--border-width));
+  width: var(--dimension);
+  height: var(--dimension);
   border-radius: 50%;
   --fill: calc(var(--percentage) * 1%);
   --color: var(--link-color);
   --middle-circle: radial-gradient(
     circle at 50% 50%,
-    var(--bg-faded-color) 10px,
-    transparent 10px
+    var(--bg-color) var(--middle-circle-radius),
+    transparent var(--middle-circle-radius)
   );
   background-image: var(--middle-circle),
-    conic-gradient(var(--color) var(--fill), var(--bg-faded-blur-color) 0);
+    conic-gradient(var(--color) var(--fill), var(--outline-color) 0);
+  transform: scale(0.7);
+  transition: transform 0.2s ease-in-out;
 }
 meter.donut.warning {
   --color: var(--orange-color);
+  transform: scale(1);
 }
 meter.donut.danger {
   --color: var(--red-color);
+  transform: scale(1);
 }
 meter.donut.explode {
   background-image: none;
+  transform: scale(1);
 }
 meter.donut:is(.warning, .danger, .explode):after {
   content: attr(data-left);
@@ -1764,12 +1805,12 @@ meter.donut[hidden] {
   width: 100%;
   flex-grow: 1;
 }
-:is(#home-page, #welcome, #columns) ~ .deck-container {
+:is(#home-page, #welcome, #columns, #loader-root) ~ .deck-container {
   z-index: 10;
   position: fixed;
   inset: 0;
 }
-:is(#home-page, #welcome, #columns):has(~ .deck-container) {
+:is(#home-page, #welcome, #columns, #loader-root):has(~ .deck-container) {
   display: block;
   position: absolute;
   user-select: none;
