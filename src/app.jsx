@@ -13,18 +13,21 @@ import {
   Routes,
   useLocation,
   useNavigate,
-  useParams,
 } from 'react-router-dom';
 import 'swiped-events';
 import { useSnapshot } from 'valtio';
 
 import AccountSheet from './components/account-sheet';
+import BackgroundService from './components/background-service';
 import Compose from './components/compose';
+import ComposeButton from './components/compose-button';
 import Drafts from './components/drafts';
-import Icon, { ICONS } from './components/icon';
+import { ICONS } from './components/icon';
 import Loader from './components/loader';
 import MediaModal from './components/media-modal';
 import Modal from './components/modal';
+import NotificationService from './components/notification-service';
+import SearchCommand from './components/search-command';
 import Shortcuts from './components/shortcuts';
 import ShortcutsSettings from './components/shortcuts-settings';
 import NotFound from './pages/404';
@@ -36,7 +39,7 @@ import FollowedHashtags from './pages/followed-hashtags';
 import Following from './pages/following';
 import Hashtag from './pages/hashtag';
 import Home from './pages/home';
-import HttpRoute from './pages/HttpRoute';
+import HttpRoute from './pages/http-route';
 import List from './pages/list';
 import Lists from './pages/lists';
 import Login from './pages/login';
@@ -45,7 +48,7 @@ import Notifications from './pages/notifications';
 import Public from './pages/public';
 import Search from './pages/search';
 import Settings from './pages/settings';
-import Status from './pages/status';
+import StatusRoute from './pages/status-route';
 import Trending from './pages/trending';
 import Welcome from './pages/welcome';
 import {
@@ -56,13 +59,11 @@ import {
   initPreferences,
 } from './utils/api';
 import { getAccessToken } from './utils/auth';
-import openCompose from './utils/open-compose';
 import showToast from './utils/show-toast';
-import states, { getStatus, saveStatus } from './utils/states';
+import states, { initStates } from './utils/states';
 import store from './utils/store';
 import { getCurrentAccount } from './utils/store-utils';
-import useInterval from './utils/useInterval';
-import usePageVisibility from './utils/usePageVisibility';
+import './utils/toast-alert';
 
 window.__STATES__ = states;
 
@@ -111,10 +112,11 @@ function App() {
     if (code) {
       console.log({ code });
       // Clear the code from the URL
-      window.history.replaceState({}, document.title, '/');
+      window.history.replaceState({}, document.title, location.pathname || '/');
 
       const clientID = store.session.get('clientID');
       const clientSecret = store.session.get('clientSecret');
+      const vapidKey = store.session.get('vapidKey');
 
       (async () => {
         setUIState('loading');
@@ -128,8 +130,9 @@ function App() {
         const masto = initClient({ instance: instanceURL, accessToken });
         await Promise.allSettled([
           initInstance(masto, instanceURL),
-          initAccount(masto, instanceURL, accessToken),
+          initAccount(masto, instanceURL, accessToken, vapidKey),
         ]);
+        initStates();
         initPreferences(masto);
 
         setIsLoggedIn(true);
@@ -280,25 +283,7 @@ function App() {
           <Route path="/:instance?/s/:id" element={<StatusRoute />} />
         </Routes>
       )}
-      {isLoggedIn && (
-        <button
-          type="button"
-          id="compose-button"
-          onClick={(e) => {
-            if (e.shiftKey) {
-              const newWin = openCompose();
-              if (!newWin) {
-                alert('Looks like your browser is blocking popups.');
-                states.showCompose = true;
-              }
-            } else {
-              states.showCompose = true;
-            }
-          }}
-        >
-          <Icon icon="quill" size="xl" alt="Compose" />
-        </button>
-      )}
+      {isLoggedIn && <ComposeButton />}
       {isLoggedIn &&
         !snapStates.settings.shortcutsColumnsMode &&
         snapStates.settings.shortcutsViewMode !== 'multi-column' && (
@@ -389,7 +374,7 @@ function App() {
           <AccountSheet
             account={snapStates.showAccount?.account || snapStates.showAccount}
             instance={snapStates.showAccount?.instance}
-            onClose={({ destination }) => {
+            onClose={({ destination } = {}) => {
               states.showAccount = false;
               if (destination) {
                 states.showAccounts = false;
@@ -445,101 +430,11 @@ function App() {
           />
         </Modal>
       )}
+      <NotificationService />
       <BackgroundService isLoggedIn={isLoggedIn} />
+      <SearchCommand onClose={focusDeck} />
     </>
   );
-}
-
-function BackgroundService({ isLoggedIn }) {
-  // Notifications service
-  // - WebSocket to receive notifications when page is visible
-  const [visible, setVisible] = useState(true);
-  usePageVisibility(setVisible);
-  const notificationStream = useRef();
-  useEffect(() => {
-    if (isLoggedIn && visible) {
-      const { masto, instance } = api();
-      (async () => {
-        // 1. Get the latest notification
-        if (states.notificationsLast) {
-          const notificationsIterator = masto.v1.notifications.list({
-            limit: 1,
-            since_id: states.notificationsLast.id,
-          });
-          const { value: notifications } = await notificationsIterator.next();
-          if (notifications?.length) {
-            states.notificationsShowNew = true;
-          }
-        }
-
-        // 2. Start streaming
-        notificationStream.current = await masto.ws.stream(
-          '/api/v1/streaming',
-          {
-            stream: 'user:notification',
-          },
-        );
-        console.log('🎏 Streaming notification', notificationStream.current);
-
-        notificationStream.current.on('notification', (notification) => {
-          console.log('🔔🔔 Notification', notification);
-          if (notification.status) {
-            saveStatus(notification.status, instance, {
-              skipThreading: true,
-            });
-          }
-          states.notificationsShowNew = true;
-        });
-
-        notificationStream.current.ws.onclose = () => {
-          console.log('🔔🔔 Notification stream closed');
-        };
-      })();
-    }
-    return () => {
-      if (notificationStream.current) {
-        notificationStream.current.ws.close();
-        notificationStream.current = null;
-      }
-    };
-  }, [visible, isLoggedIn]);
-
-  // Check for updates service
-  const lastCheckDate = useRef();
-  const checkForUpdates = () => {
-    lastCheckDate.current = Date.now();
-    console.log('✨ Check app update');
-    fetch('./version.json')
-      .then((r) => r.json())
-      .then((info) => {
-        if (info) states.appVersion = info;
-      })
-      .catch((e) => {
-        console.error(e);
-      });
-  };
-  useInterval(checkForUpdates, visible && 1000 * 60 * 30); // 30 minutes
-  usePageVisibility((visible) => {
-    if (visible) {
-      if (!lastCheckDate.current) {
-        checkForUpdates();
-      } else {
-        const diff = Date.now() - lastCheckDate.current;
-        if (diff > 1000 * 60 * 60) {
-          // 1 hour
-          checkForUpdates();
-        }
-      }
-    }
-  });
-
-  return null;
-}
-
-function StatusRoute() {
-  const params = useParams();
-  const { id, instance } = params;
-  return <Status id={id} instance={instance} />;
 }
 
 export { App };

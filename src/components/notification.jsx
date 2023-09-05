@@ -18,6 +18,8 @@ const NOTIFICATION_ICONS = {
   favourite: 'heart',
   poll: 'poll',
   update: 'pencil',
+  'admin.signup': 'account-edit',
+  'admin.report': 'account-warning',
 };
 
 /*
@@ -39,25 +41,32 @@ const contentText = {
   mention: 'mentioned you in their post.',
   status: 'published a post.',
   reblog: 'boosted your post.',
+  'reblog+account': (count) => `boosted ${count} of your posts.`,
   reblog_reply: 'boosted your reply.',
   follow: 'followed you.',
   follow_request: 'requested to follow you.',
   favourite: 'favourited your post.',
+  'favourite+account': (count) => `favourited ${count} of your posts.`,
   favourite_reply: 'favourited your reply.',
   poll: 'A poll you have voted in or created has ended.',
   'poll-self': 'A poll you have created has ended.',
   'poll-voted': 'A poll you have voted in has ended.',
   update: 'A post you interacted with has been edited.',
   'favourite+reblog': 'boosted & favourited your post.',
+  'favourite+reblog+account': (count) =>
+    `boosted & favourited ${count} of your posts.`,
   'favourite+reblog_reply': 'boosted & favourited your reply.',
+  'admin.signup': 'signed up.',
+  'admin.report': 'reported a post.',
 };
 
-function Notification({ notification, instance, reload }) {
-  const { id, status, account, _accounts } = notification;
+function Notification({ notification, instance, reload, isStatic }) {
+  const { id, status, account, _accounts, _statuses } = notification;
   let { type } = notification;
 
   // status = Attached when type of the notification is favourite, reblog, status, mention, poll, or update
-  const actualStatusID = status?.reblog?.id || status?.id;
+  const actualStatus = status?.reblog || status;
+  const actualStatusID = actualStatus?.id;
 
   const currentAccount = store.session.get('currentAccount');
   const isSelf = currentAccount === account?.id;
@@ -90,11 +99,23 @@ function Notification({ notification, instance, reload }) {
     type === 'favourite' ||
     type === 'favourite+reblog'
   ) {
-    text =
-      contentText[isReplyToOthers ? `${type}_reply` : type] ||
-      contentText[type];
-  } else {
+    if (_statuses?.length > 1) {
+      text = contentText[`${type}+account`];
+    } else if (isReplyToOthers) {
+      text = contentText[`${type}_reply`];
+    } else {
+      text = contentText[type];
+    }
+  } else if (contentText[type]) {
     text = contentText[type];
+  } else {
+    // Anticipate unhandled notification types, possibly from Mastodon forks or non-Mastodon instances
+    // This surfaces the error to the user, hoping that users will report it
+    text = `[Unknown notification type: ${type}]`;
+  }
+
+  if (typeof text === 'function') {
+    text = text(_statuses?.length || _accounts?.length);
   }
 
   if (type === 'mention' && !status) {
@@ -102,11 +123,14 @@ function Notification({ notification, instance, reload }) {
     return null;
   }
 
+  const formattedCreatedAt =
+    notification.createdAt && new Date(notification.createdAt).toLocaleString();
+
   return (
     <div class={`notification notification-${type}`} tabIndex="0">
       <div
         class={`notification-type notification-${type}`}
-        title={new Date(notification.createdAt).toLocaleString()}
+        title={formattedCreatedAt}
       >
         {type === 'favourite+reblog' ? (
           <>
@@ -206,7 +230,23 @@ function Notification({ notification, instance, reload }) {
             ))}
           </p>
         )}
-        {status && (
+        {_statuses?.length > 1 && (
+          <ul class="notification-group-statuses">
+            {_statuses.map((status) => (
+              <li key={status.id}>
+                <Link
+                  class={`status-link status-type-${type}`}
+                  to={
+                    instance ? `/${instance}/s/${status.id}` : `/s/${status.id}`
+                  }
+                >
+                  <Status status={status} size="s" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {status && (!_statuses?.length || _statuses?.length <= 1) && (
           <Link
             class={`status-link status-type-${type}`}
             to={
@@ -215,7 +255,11 @@ function Notification({ notification, instance, reload }) {
                 : `/s/${actualStatusID}`
             }
           >
-            <Status statusID={actualStatusID} size="s" />
+            {isStatic ? (
+              <Status status={actualStatus} size="s" />
+            ) : (
+              <Status statusID={actualStatusID} size="s" />
+            )}
           </Link>
         )}
       </div>

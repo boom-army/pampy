@@ -1,6 +1,7 @@
 import './login.css';
 
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useSearchParams } from 'react-router-dom';
 
 import Link from '../components/link';
 import Loader from '../components/loader';
@@ -14,8 +15,10 @@ function Login() {
   const instanceURLRef = useRef();
   const cachedInstanceURL = store.local.get('instanceURL');
   const [uiState, setUIState] = useState('default');
+  const [searchParams] = useSearchParams();
+  const instance = searchParams.get('instance');
   const [instanceText, setInstanceText] = useState(
-    cachedInstanceURL?.toLowerCase() || '',
+    instance || cachedInstanceURL?.toLowerCase() || '',
   );
 
   const [instancesList, setInstancesList] = useState([]);
@@ -44,13 +47,15 @@ function Login() {
     (async () => {
       setUIState('loading');
       try {
-        const { client_id, client_secret } = await registerApplication({
-          instanceURL,
-        });
+        const { client_id, client_secret, vapid_key } =
+          await registerApplication({
+            instanceURL,
+          });
 
         if (client_id && client_secret) {
           store.session.set('clientID', client_id);
           store.session.set('clientSecret', client_secret);
+          store.session.set('vapidKey', vapid_key);
 
           location.href = await getAuthorizationURL({
             instanceURL,
@@ -83,6 +88,24 @@ function Login() {
     submitInstance(instanceURL);
   };
 
+  const instancesSuggestions = instanceText
+    ? instancesList
+        .filter((instance) => instance.includes(instanceText))
+        .sort((a, b) => {
+          // Move text that starts with instanceText to the start
+          const aStartsWith = a
+            .toLowerCase()
+            .startsWith(instanceText.toLowerCase());
+          const bStartsWith = b
+            .toLowerCase()
+            .startsWith(instanceText.toLowerCase());
+          if (aStartsWith && !bStartsWith) return -1;
+          if (!aStartsWith && bStartsWith) return 1;
+          return 0;
+        })
+        .slice(0, 10)
+    : [];
+
   return (
     <main id="login" style={{ textAlign: 'center' }}>
       <form onSubmit={onSubmit}>
@@ -113,11 +136,9 @@ function Login() {
               setInstanceText(e.target.value);
             }}
           />
-          {/* <ul id="instances-suggestions">
-            {instancesList
-              .filter((instance) => instance.includes(instanceText))
-              .slice(0, 10)
-              .map((instance) => (
+          {/* {instancesSuggestions?.length > 0 ? (
+            <ul id="instances-suggestions">
+              {instancesSuggestions.map((instance) => (
                 <li>
                   <button
                     type="button"
@@ -130,7 +151,10 @@ function Login() {
                   </button>
                 </li>
               ))}
-          </ul> */}
+            </ul>
+          ) : (
+            <div id="instances-eg">e.g. &ldquo;mastodon.social&rsquo;</div>
+          )} */}
           {/* <datalist id="instances-list">
             {instancesList.map((instance) => (
               <option value={instance} />

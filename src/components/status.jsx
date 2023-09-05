@@ -837,7 +837,9 @@ function Status({
       ref={statusRef}
       tabindex="-1"
       class={`status ${
-        !withinContext && inReplyToAccount ? 'status-reply-to' : ''
+        !withinContext && inReplyToId && inReplyToAccount
+          ? 'status-reply-to'
+          : ''
       } visibility-${visibility} ${_pinned ? 'status-pinned' : ''} ${
         {
           s: 'small',
@@ -1003,7 +1005,7 @@ function Status({
         )}
         {!withinContext && (
           <>
-            {inReplyToAccountId === status.account?.id ||
+            {(!!inReplyToId && inReplyToAccountId === status.account?.id) ||
             !!snapStates.statusThreadNumber[sKey] ? (
               <div class="status-thread-badge">
                 <Icon icon="thread" size="s" />
@@ -1045,7 +1047,7 @@ function Status({
           {!!spoilerText && (
             <>
               <div
-                class="content"
+                class="content spoiler-content"
                 lang={language}
                 dir="auto"
                 ref={spoilerContentRef}
@@ -1073,14 +1075,10 @@ function Status({
               </button>
             </>
           )}
-          <div
-            class="content"
-            lang={language}
-            dir="auto"
-            ref={contentRef}
-            data-read-more={readMoreText}
-          >
+          <div class="content" ref={contentRef} data-read-more={readMoreText}>
             <div
+              lang={language}
+              dir="auto"
               class="inner-content"
               onClick={handleContentLinks({ mentions, instance, previewMode })}
               dangerouslySetInnerHTML={{
@@ -1174,9 +1172,7 @@ function Status({
                         (option) =>
                           `- ${option.title}${
                             option.votesCount >= 0
-                              ? ` (${option.votesCount} vote${
-                                  option.votesCount !== 1 ? 's' : ''
-                                })`
+                              ? ` (${option.votesCount})`
                               : ''
                           }`,
                       )
@@ -1440,6 +1436,7 @@ function Card({ card, instance }) {
     url,
     type,
     embedUrl,
+    language,
   } = card;
 
   /* type
@@ -1503,6 +1500,7 @@ function Card({ card, instance }) {
         target={cardStatusURL ? null : '_blank'}
         rel="nofollow noopener noreferrer"
         class={`card link ${blurhashImage ? '' : size}`}
+        lang={language}
       >
         <div class="card-image">
           <img
@@ -1571,6 +1569,7 @@ function Card({ card, instance }) {
         target={cardStatusURL ? null : '_blank'}
         rel="nofollow noopener noreferrer"
         class={`card link no-image`}
+        lang={language}
       >
         <div class="meta-container">
           <p class="meta domain">
