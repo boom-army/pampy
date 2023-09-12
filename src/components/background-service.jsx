@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { api } from '../utils/api';
@@ -5,7 +6,7 @@ import states, { saveStatus } from '../utils/states';
 import useInterval from '../utils/useInterval';
 import usePageVisibility from '../utils/usePageVisibility';
 
-export default function BackgroundService({ isLoggedIn }) {
+export default memo(function BackgroundService({ isLoggedIn }) {
   // Notifications service
   // - WebSocket to receive notifications when page is visible
   const [visible, setVisible] = useState(true);
@@ -23,7 +24,20 @@ export default function BackgroundService({ isLoggedIn }) {
           });
           const { value: notifications } = await notificationsIterator.next();
           if (notifications?.length) {
-            states.notificationsShowNew = true;
+            let lastReadId;
+            try {
+              const markers = await masto.v1.markers.fetch({
+                timeline: 'notifications',
+              });
+              lastReadId = markers?.notifications?.lastReadId;
+            } catch (e) {}
+            if (lastReadId) {
+              if (notifications[0].id !== lastReadId) {
+                states.notificationsShowNew = true;
+              }
+            } else {
+              states.notificationsShowNew = true;
+            }
           }
         }
 
@@ -89,4 +103,4 @@ export default function BackgroundService({ isLoggedIn }) {
   });
 
   return null;
-}
+});

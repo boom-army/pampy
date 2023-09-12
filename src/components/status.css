@@ -589,7 +589,7 @@
   grid-auto-rows: 1fr;
   gap: 2px;
   /* height: 160px; */
-  min-height: 44px;
+  min-height: 88px;
   height: auto;
   /* max-height: max(160px, 33vh); */
 }
@@ -614,6 +614,7 @@
   max-height: 60vh;
 }
 .status .media-container .media {
+  box-sizing: content-box;
   --media-border-width: 1px;
   --media-radius: 16px;
   --media-radius-inner: 4px;
@@ -633,9 +634,9 @@
 .status .media-container.media-eq1 .media {
   display: inline-block;
   max-width: 100% !important;
-  min-width: 44px;
+  min-width: 88px;
   /* width: auto; */
-  min-height: 44px;
+  min-height: 88px;
   /* --maxAspectHeight: max(160px, 33vh);
   --aspectWidth: calc(--width / --height * var(--maxAspectHeight)); */
   width: min(var(--aspectWidth), var(--width), 100%);
@@ -735,6 +736,7 @@
 }
 .status .media:active {
   filter: brightness(0.8);
+  transform: scale(0.99);
 }
 .status .media :is(img, video) {
   width: 100%;
@@ -757,7 +759,7 @@ body:has(#modal-container .carousel) .status .media img:hover {
 .status .media video {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: scale-down;
   /* border-radius: calc(var(--media-radius) - var(--media-border-width)); */
   border-radius: inherit;
 }
@@ -830,7 +832,7 @@ body:has(#modal-container .carousel) .status .media img:hover {
   width: fit-content;
 }
 .status .media-contain video {
-  object-fit: contain !important;
+  object-fit: scale-down !important;
 }
 /* .status .media-audio {
   border: 0;
@@ -1383,7 +1385,7 @@ a.card:is(:hover, :focus) {
   width: 1.2em;
   height: 1.2em;
   vertical-align: text-bottom;
-  object-fit: contain;
+  object-fit: scale-down;
 }
 
 /* EDIT HISTORY */

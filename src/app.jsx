@@ -23,6 +23,7 @@ import Compose from './components/compose';
 import ComposeButton from './components/compose-button';
 import Drafts from './components/drafts';
 import { ICONS } from './components/icon';
+import KeyboardShortcutsHelp from './components/keyboard-shortcuts-help';
 import Loader from './components/loader';
 import MediaModal from './components/media-modal';
 import Modal from './components/modal';
@@ -184,7 +185,7 @@ function App() {
     }, 100);
     return () => clearTimeout(timer);
   };
-  useEffect(focusDeck, [location]);
+  useEffect(focusDeck, [location, isLoggedIn]);
   const showModal =
     snapStates.showCompose ||
     snapStates.showSettings ||
@@ -192,16 +193,20 @@ function App() {
     snapStates.showAccount ||
     snapStates.showDrafts ||
     snapStates.showMediaModal ||
-    snapStates.showShortcutsSettings;
+    snapStates.showShortcutsSettings ||
+    snapStates.showKeyboardShortcutsHelp;
   useEffect(() => {
     if (!showModal) focusDeck();
   }, [showModal]);
 
   const { prevLocation } = snapStates;
   const backgroundLocation = useRef(prevLocation || null);
-  const isModalPage =
-    matchPath('/:instance/s/:id', location.pathname) ||
-    matchPath('/s/:id', location.pathname);
+  const isModalPage = useMemo(() => {
+    return (
+      matchPath('/:instance/s/:id', location.pathname) ||
+      matchPath('/s/:id', location.pathname)
+    );
+  }, [location.pathname, matchPath]);
   if (isModalPage) {
     if (!backgroundLocation.current) backgroundLocation.current = prevLocation;
   } else {
@@ -433,6 +438,7 @@ function App() {
       <NotificationService />
       <BackgroundService isLoggedIn={isLoggedIn} />
       <SearchCommand onClose={focusDeck} />
+      <KeyboardShortcutsHelp />
     </>
   );
 }
