@@ -48,6 +48,7 @@ import showToast from '../utils/show-toast';
 import states, { getStatus, saveStatus, statusKey } from '../utils/states';
 import statusPeek from '../utils/status-peek';
 import store from '../utils/store';
+import useTruncated from '../utils/useTruncated';
 import visibilityIconsMap from '../utils/visibility-icons-map';
 
 import Avatar from './avatar';
@@ -228,7 +229,12 @@ function Status({
     inReplyToAccountId === currentAccount ||
     mentions?.find((mention) => mention.id === currentAccount);
 
-  const showSpoiler = previewMode || !!snapStates.spoilers[id] || false;
+  const readingExpandSpoilers = useMemo(() => {
+    const prefs = store.account.get('preferences') || {};
+    return !!prefs['reading:expand:spoilers'];
+  }, []);
+  const showSpoiler =
+    previewMode || readingExpandSpoilers || !!snapStates.spoilers[id] || false;
 
   if (reblog) {
     // If has statusID, means useItemID (cached in states)
@@ -313,40 +319,9 @@ function Status({
   const [showEdited, setShowEdited] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
 
-  const spoilerContentRef = useRef(null);
-  useResizeObserver({
-    ref: spoilerContentRef,
-    onResize: () => {
-      if (spoilerContentRef.current) {
-        const { scrollHeight, clientHeight } = spoilerContentRef.current;
-        if (scrollHeight < window.innerHeight * 0.4) {
-          spoilerContentRef.current.classList.remove('truncated');
-        } else {
-          spoilerContentRef.current.classList.toggle(
-            'truncated',
-            scrollHeight > clientHeight,
-          );
-        }
-      }
-    },
-  });
-  const contentRef = useRef(null);
-  useResizeObserver({
-    ref: contentRef,
-    onResize: () => {
-      if (contentRef.current) {
-        const { scrollHeight, clientHeight } = contentRef.current;
-        if (scrollHeight < window.innerHeight * 0.4) {
-          contentRef.current.classList.remove('truncated');
-        } else {
-          contentRef.current.classList.toggle(
-            'truncated',
-            scrollHeight > clientHeight,
-          );
-        }
-      }
-    },
-  });
+  const spoilerContentRef = useTruncated();
+  const contentRef = useTruncated();
+  const mediaContainerRef = useTruncated();
   const readMoreText = 'Read more →';
 
   const statusRef = useRef(null);
@@ -1128,6 +1103,7 @@ function Status({
               <button
                 class={`light spoiler ${showSpoiler ? 'spoiling' : ''}`}
                 type="button"
+                disabled={readingExpandSpoilers}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -1139,7 +1115,11 @@ function Status({
                 }}
               >
                 <Icon icon={showSpoiler ? 'eye-open' : 'eye-close'} />{' '}
-                {showSpoiler ? 'Show less' : 'Show more'}
+                {readingExpandSpoilers
+                  ? 'Content warning'
+                  : showSpoiler
+                  ? 'Show less'
+                  : 'Show more'}
               </button>
             </>
           )}
@@ -1148,7 +1128,12 @@ function Status({
               lang={language}
               dir="auto"
               class="inner-content"
-              onClick={handleContentLinks({ mentions, instance, previewMode })}
+              onClick={handleContentLinks({
+                mentions,
+                instance,
+                previewMode,
+                statusURL: url,
+              })}
               dangerouslySetInnerHTML={{
                 __html: enhanceContent(content, {
                   emojis,
@@ -1269,6 +1254,7 @@ function Status({
           )}
           {!!mediaAttachments.length && (
             <div
+              ref={mediaContainerRef}
               class={`media-container media-eq${mediaAttachments.length} ${
                 mediaAttachments.length > 2 ? 'media-gt2' : ''
               } ${mediaAttachments.length > 4 ? 'media-gt4' : ''}`}
@@ -1569,6 +1555,7 @@ function Card({ card, instance }) {
         rel="nofollow noopener noreferrer"
         class={`card link ${blurhashImage ? '' : size}`}
         lang={language}
+        dir="auto"
       >
         <div class="card-image">
           <img
@@ -1585,9 +1572,15 @@ function Card({ card, instance }) {
           />
         </div>
         <div class="meta-container">
-          <p class="meta domain">{domain}</p>
-          <p class="title">{title}</p>
-          <p class="meta">{description || providerName || authorName}</p>
+          <p class="meta domain" dir="auto">
+            {domain}
+          </p>
+          <p class="title" dir="auto">
+            {title}
+          </p>
+          <p class="meta" dir="auto">
+            {description || providerName || authorName}
+          </p>
         </div>
       </a>
     );
@@ -2096,6 +2089,8 @@ function FilteredStatus({ status, filterInfo, instance, containerProps = {} }) {
     },
   );
 
+  const statusPeekRef = useTruncated();
+
   return (
     <div
       class={isReblog ? (group ? 'status-group' : 'status-reblog') : ''}
@@ -2169,16 +2164,15 @@ function FilteredStatus({ status, filterInfo, instance, containerProps = {} }) {
             </header>
             <main tabIndex="-1">
               <Link
+                ref={statusPeekRef}
                 class="status-link"
                 to={`/${instance}/s/${status.id}`}
                 onClick={() => {
                   setShowPeek(false);
                 }}
+                data-read-more="Read more →"
               >
                 <Status status={status} instance={instance} size="s" readOnly />
-                <button type="button" class="status-post-link plain3">
-                  See post &raquo;
-                </button>
               </Link>
             </main>
           </div>
@@ -2206,6 +2200,7 @@ const QuoteStatuses = memo(({ id, instance, level = 0 }) => {
         key={q.instance + q.id}
         to={`${q.instance ? `/${q.instance}` : ''}/s/${q.id}`}
         class="status-card-link"
+        data-read-more="Read more →"
       >
         <Status
           statusID={q.id}

@@ -1,4 +1,5 @@
 import { getBlurHashAverageColor } from 'fast-blurhash';
+import { Fragment } from 'preact';
 import {
   useCallback,
   useLayoutEffect,
@@ -103,7 +104,11 @@ function Media({ media, to, showOriginal, autoAnimate, onClick = () => {} }) {
     [to],
   );
 
-  const isImage = type === 'image' || (type === 'unknown' && previewUrl);
+  const isVideoMaybe =
+    type === 'unknown' &&
+    /\.(mp4|m4a|m4p|m4b|m4r|m4v|mov|webm)$/i.test(remoteMediaURL);
+  const isImage =
+    type === 'image' || (type === 'unknown' && previewUrl && !isVideoMaybe);
 
   const parentRef = useRef();
   const [imageSmallerThanParent, setImageSmallerThanParent] = useState(false);
@@ -221,7 +226,7 @@ function Media({ media, to, showOriginal, autoAnimate, onClick = () => {} }) {
         )}
       </Parent>
     );
-  } else if (type === 'gifv' || type === 'video') {
+  } else if (type === 'gifv' || type === 'video' || isVideoMaybe) {
     const shortDuration = original.duration < 31;
     const isGIF = type === 'gifv' && shortDuration;
     // If GIF is too long, treat it as a video
@@ -247,90 +252,104 @@ function Media({ media, to, showOriginal, autoAnimate, onClick = () => {} }) {
     ></video>
   `;
 
+    const showInlineDesc = !showOriginal && !isGIF && !!description;
+    const Container = showInlineDesc ? 'figure' : Fragment;
+
     return (
-      <Parent
-        class={`media media-${isGIF ? 'gif' : 'video'} ${
-          autoGIFAnimate ? 'media-contain' : ''
-        }`}
-        data-orientation={orientation}
-        data-formatted-duration={formattedDuration}
-        data-label={isGIF && !showOriginal && !autoGIFAnimate ? 'GIF' : ''}
-        // style={{
-        //   backgroundColor:
-        //     rgbAverageColor && `rgb(${rgbAverageColor.join(',')})`,
-        // }}
-        style={!showOriginal && mediaStyles}
-        onClick={(e) => {
-          if (hoverAnimate) {
-            try {
-              videoRef.current.pause();
-            } catch (e) {}
-          }
-          onClick(e);
-        }}
-        onMouseEnter={() => {
-          if (hoverAnimate) {
-            try {
-              videoRef.current.play();
-            } catch (e) {}
-          }
-        }}
-        onMouseLeave={() => {
-          if (hoverAnimate) {
-            try {
-              videoRef.current.pause();
-            } catch (e) {}
-          }
-        }}
-      >
-        {showOriginal || autoGIFAnimate ? (
-          isGIF && showOriginal ? (
-            <QuickPinchZoom {...quickPinchZoomProps} enabled>
+      <Container>
+        <Parent
+          class={`media media-${isGIF ? 'gif' : 'video'} ${
+            autoGIFAnimate ? 'media-contain' : ''
+          }`}
+          data-orientation={orientation}
+          data-formatted-duration={formattedDuration}
+          data-label={isGIF && !showOriginal && !autoGIFAnimate ? 'GIF' : ''}
+          // style={{
+          //   backgroundColor:
+          //     rgbAverageColor && `rgb(${rgbAverageColor.join(',')})`,
+          // }}
+          style={!showOriginal && mediaStyles}
+          onClick={(e) => {
+            if (hoverAnimate) {
+              try {
+                videoRef.current.pause();
+              } catch (e) {}
+            }
+            onClick(e);
+          }}
+          onMouseEnter={() => {
+            if (hoverAnimate) {
+              try {
+                videoRef.current.play();
+              } catch (e) {}
+            }
+          }}
+          onMouseLeave={() => {
+            if (hoverAnimate) {
+              try {
+                videoRef.current.pause();
+              } catch (e) {}
+            }
+          }}
+        >
+          {showOriginal || autoGIFAnimate ? (
+            isGIF && showOriginal ? (
+              <QuickPinchZoom {...quickPinchZoomProps} enabled>
+                <div
+                  ref={mediaRef}
+                  dangerouslySetInnerHTML={{
+                    __html: videoHTML,
+                  }}
+                />
+              </QuickPinchZoom>
+            ) : (
               <div
-                ref={mediaRef}
+                class="video-container"
                 dangerouslySetInnerHTML={{
                   __html: videoHTML,
                 }}
               />
-            </QuickPinchZoom>
-          ) : (
-            <div
-              class="video-container"
-              dangerouslySetInnerHTML={{
-                __html: videoHTML,
-              }}
-            />
-          )
-        ) : isGIF ? (
-          <video
-            ref={videoRef}
-            src={url}
-            poster={previewUrl}
-            width={width}
-            height={height}
-            data-orientation={orientation}
-            preload="auto"
-            // controls
-            playsinline
-            loop
-            muted
-          />
-        ) : (
-          <>
-            <img
-              src={previewUrl}
-              alt={description}
+            )
+          ) : isGIF ? (
+            <video
+              ref={videoRef}
+              src={url}
+              poster={previewUrl}
               width={width}
               height={height}
               data-orientation={orientation}
-              loading="lazy"
+              preload="auto"
+              // controls
+              playsinline
+              loop
+              muted
             />
-            <div class="media-play">
-              <Icon icon="play" size="xl" />
-            </div>
-          </>
+          ) : (
+            <>
+              <img
+                src={previewUrl}
+                alt={showInlineDesc ? '' : description}
+                width={width}
+                height={height}
+                data-orientation={orientation}
+                loading="lazy"
+              />
+              <div class="media-play">
+                <Icon icon="play" size="xl" />
+              </div>
+            </>
+          )}
+        </Parent>
+        {showInlineDesc && (
+          <figcaption
+            onClick={() => {
+              location.hash = to;
+            }}
+          >
+            {description}
+          </figcaption>
         )}
-      </Parent>
+      </Container>
     );
   } else if (type === 'audio') {
     const formattedDuration = formatDuration(original.duration);

@@ -23,6 +23,9 @@ const SearchForm = forwardRef((props, ref) => {
     focus: () => {
       searchFieldRef.current.focus();
     },
+    select: () => {
+      searchFieldRef.current.select();
+    },
     blur: () => {
       searchFieldRef.current.blur();
     },
@@ -67,6 +70,9 @@ const SearchForm = forwardRef((props, ref) => {
         // autofocus
         placeholder="Search"
         dir="auto"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
         onSearch={(e) => {
           if (!e.target.value) {
             setSearchParams({});
