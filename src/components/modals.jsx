@@ -11,6 +11,7 @@ import AccountSheet from './account-sheet';
 import Compose from './compose';
 import Drafts from './drafts';
 import GenericAccounts from './generic-accounts';
+import MediaAltModal from './media-alt-modal';
 import MediaModal from './media-modal';
 import Modal from './modal';
 import ShortcutsSettings from './shortcuts-settings';
@@ -50,13 +51,17 @@ export default function Modals() {
               null
             }
             onClose={(results) => {
-              const { newStatus, instance } = results || {};
+              const { newStatus, instance, type } = results || {};
               states.showCompose = false;
               window.__COMPOSE__ = null;
               if (newStatus) {
                 states.reloadStatusPage++;
                 showToast({
-                  text: 'Post published. Check it out.',
+                  text: {
+                    post: 'Post published. Check it out.',
+                    reply: 'Reply posted. Check it out.',
+                    edit: 'Post updated. Check it out.',
+                  }[type || 'post'],
                   delay: 1000,
                   duration: 10_000, // 10 seconds
                   onClick: (toast) => {
@@ -171,6 +176,24 @@ export default function Modals() {
         >
           <GenericAccounts
             onClose={() => (states.showGenericAccounts = false)}
+          />
+        </Modal>
+      )}
+      {!!snapStates.showMediaAlt && (
+        <Modal
+          class="light"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              states.showMediaAlt = false;
+            }
+          }}
+        >
+          <MediaAltModal
+            alt={snapStates.showMediaAlt.alt || snapStates.showMediaAlt}
+            lang={snapStates.showMediaAlt?.lang}
+            onClose={() => {
+              states.showMediaAlt = false;
+            }}
           />
         </Modal>
       )}

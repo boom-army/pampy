@@ -154,8 +154,11 @@
 .status.large .status-card :is(.content, .poll, .media-container) {
   max-height: 80vh !important;
 }
-.status-card :is(.content.truncated, .poll, .media-container.truncated) {
+.status-card :is(.content, .poll, .media-container) {
   font-size: inherit !important;
+}
+.status-card :is(.content.truncated, .poll, .media-container.truncated) {
+  /* font-size: inherit !important; */
   mask-image: linear-gradient(to bottom, #000 80px, transparent);
 }
 .status.small
@@ -199,6 +202,10 @@
   display: flex;
   gap: 8px;
   align-items: center;
+
+  .status-carousel & {
+    padding: 16px 16px 16px 24px;
+  }
 }
 .status.filtered .status-filtered-info {
   pointer-events: none;
@@ -283,7 +290,7 @@
   overflow: hidden;
   /* text-overflow: ellipsis; */
 }
-.status > .container > .meta .name-text {
+.status > .container > .meta .meta-name {
   mask-image: linear-gradient(to left, transparent, black 16px);
   flex-grow: 1;
 }
@@ -441,7 +448,7 @@
 .status
   .content-container.has-spoiler:not(.show-spoiler)
   .spoiler
-  ~ *:not(.media-container, .card),
+  ~ *:not(.media-container, .card, .media-figure-multiple),
 .status
   .content-container.has-spoiler:not(.show-spoiler)
   .spoiler
@@ -450,7 +457,7 @@
 .status
   .content-container.has-spoiler:not(.show-spoiler)
   .spoiler
-  ~ .media-container
+  ~ :is(.media-container, .media-figure-multiple)
   figcaption {
   filter: blur(5px) invert(0.5);
   image-rendering: crisp-edges;
@@ -464,7 +471,7 @@
 .status
   .content-container.has-spoiler:not(.show-spoiler)
   .spoiler
-  ~ .media-container
+  ~ :is(.media-container, .media-figure-multiple)
   .media
   > *,
 .status
@@ -528,7 +535,7 @@
   max-height: 40vh;
   max-height: 40dvh;
 }
-.timeline-deck .status .content.truncated {
+.timeline-deck .status:not(.truncated .status) .content.truncated {
   mask-image: linear-gradient(
     to top,
     transparent,
@@ -536,7 +543,7 @@
     black 1.5em
   );
 }
-.timeline-deck .status .content.truncated:after {
+.timeline-deck .status:not(.truncated .status) .content.truncated:after {
   content: attr(data-read-more);
   line-height: 1;
   display: inline-block;
@@ -692,21 +699,20 @@
   figure {
     margin: 0;
     padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    column-gap: 4px;
 
     figcaption {
-      margin: -2px 0 0;
-      padding: 0 4px;
+      padding: 4px;
       font-size: 90%;
       color: var(--text-insignificant-color);
-      overflow: hidden;
-      white-space: normal;
-      display: -webkit-box;
-      display: box;
-      -webkit-box-orient: vertical;
-      box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
       line-height: 1.2;
+      cursor: pointer;
+      white-space: pre-line;
+      flex-basis: 15em;
+      flex-grow: 1;
     }
   }
 
@@ -817,7 +823,7 @@
 .status .media:is(:hover, :focus) {
   border-color: var(--outline-hover-color);
 }
-.status .media:active {
+.status .media:active:not(:has(button:active)) {
   filter: brightness(0.8);
   transform: scale(0.99);
 }
@@ -829,6 +835,22 @@
 }
 .status .media {
   cursor: pointer;
+
+  &[data-has-alt] {
+    position: relative;
+
+    .alt-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+
+      &:before {
+        content: '';
+        position: absolute;
+        inset: -12px;
+      }
+    }
+  }
 }
 .status .media img:is(:hover, :focus),
 a:focus-visible .status .media img {
@@ -858,9 +880,9 @@ body:has(#modal-container .carousel) .status .media img:hover {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  color: var(--video-fg-color);
-  background-color: var(--video-bg-color);
-  box-shadow: inset 0 0 0 2px var(--video-outline-color);
+  color: var(--media-fg-color);
+  background-color: var(--media-bg-color);
+  box-shadow: inset 0 0 0 2px var(--media-outline-color);
   display: flex;
   place-content: center;
   place-items: center;
@@ -877,9 +899,9 @@ body:has(#modal-container .carousel) .status .media img:hover {
   position: absolute;
   bottom: 8px;
   right: 8px;
-  color: var(--video-fg-color);
-  background-color: var(--video-bg-color);
-  border: var(--hairline-width) solid var(--video-outline-color);
+  color: var(--media-fg-color);
+  background-color: var(--media-bg-color);
+  border: var(--hairline-width) solid var(--media-outline-color);
   border-radius: 4px;
   padding: 0 4px;
 }
@@ -894,9 +916,9 @@ body:has(#modal-container .carousel) .status .media img:hover {
   position: absolute;
   bottom: 8px;
   right: 8px;
-  color: var(--bg-faded-color);
-  background-color: var(--text-insignificant-color);
-  backdrop-filter: blur(6px) saturate(3) invert(0.2);
+  color: var(--media-fg-color);
+  background-color: var(--media-bg-color);
+  border: var(--hairline-width) solid var(--media-outline-color);
   border-radius: 4px;
   padding: 0 4px;
 }
@@ -963,6 +985,37 @@ body:has(#modal-container .carousel) .status .media img:hover {
   white-space: normal;
 }
 
+.media-figure-multiple {
+  margin: 0;
+  padding: 0;
+
+  figcaption {
+    padding: 4px;
+    font-size: 90%;
+    color: var(--text-insignificant-color);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    & > * {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      &:hover {
+        color: var(--text-color);
+        cursor: pointer;
+      }
+    }
+
+    sup {
+      opacity: 0.75;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
 .carousel-item {
   position: relative;
 }
@@ -987,6 +1040,12 @@ body:has(#modal-container .carousel) .status .media img:hover {
   font-size: 90%;
   z-index: 1;
   text-shadow: 0 var(--hairline-width) var(--bg-color);
+  mix-blend-mode: luminosity;
+  white-space: pre-line;
+
+  &:is(:hover, :focus) {
+    mix-blend-mode: normal;
+  }
 }
 .carousel-item button.media-alt .media-alt-desc {
   overflow: hidden;
@@ -1621,4 +1680,38 @@ a.card:is(:hover, :focus):visited {
 }
 #reactions-container .reactions-block .reblog-icon {
   color: var(--reblog-color);
+}
+
+/* ALT BADGE */
+
+.alt-badge {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--media-fg-color);
+  background-color: var(--media-bg-color);
+  border: var(--hairline-width) solid var(--media-outline-color);
+  mix-blend-mode: luminosity;
+  border-radius: 4px;
+  padding: 4px;
+  opacity: 0.65;
+
+  sup {
+    vertical-align: super;
+    font-weight: normal;
+    line-height: 0;
+    padding-left: 2px;
+  }
+
+  &.clickable {
+    opacity: 0.75;
+    border-width: 2px;
+
+    &:is(:hover, :focus):not(:active) {
+      transition: 0.15s ease-out;
+      transition-property: transform, opacity, mix-blend-mode;
+      transform: scale(1.15);
+      opacity: 0.9;
+      mix-blend-mode: normal;
+    }
+  }
 }

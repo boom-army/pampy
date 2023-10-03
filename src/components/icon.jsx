@@ -99,6 +99,7 @@ export const ICONS = {
   'account-edit': () => import('@iconify-icons/mingcute/user-edit-line'),
   'account-warning': () => import('@iconify-icons/mingcute/user-warning-line'),
   keyboard: () => import('@iconify-icons/mingcute/keyboard-line'),
+  cloud: () => import('@iconify-icons/mingcute/cloud-line'),
 };
 
 function Icon({
@@ -125,7 +126,7 @@ function Icon({
   }, [iconBlock]);
 
   return (
-    <div
+    <span
       class={`icon ${className}`}
       title={title || alt}
       style={{
@@ -150,7 +151,7 @@ function Icon({
           }}
         />
       )}
-    </div>
+    </span>
   );
 }
 

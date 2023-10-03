@@ -50,7 +50,7 @@
   --reply-to-color: var(--orange-color);
   --reply-to-text-color: #b36200;
   --favourite-color: var(--red-color);
-  --reply-to-faded-color: #ffa60030;
+  --reply-to-faded-color: #ffa60020;
   --outline-color: rgba(128, 128, 128, 0.2);
   --outline-hover-color: rgba(128, 128, 128, 0.7);
   --divider-color: rgba(0, 0, 0, 0.1);
@@ -67,9 +67,9 @@
   --close-button-hover-color: rgba(0, 0, 0, 1);
 
   /* Video colors won't change based on color scheme */
-  --video-fg-color: #f0f2f5;
-  --video-bg-color: #242526;
-  --video-outline-color: color-mix(in lch, var(--video-fg-color), transparent);
+  --media-fg-color: #f0f2f5;
+  --media-bg-color: #242526;
+  --media-outline-color: color-mix(in lch, var(--media-fg-color), transparent);
 
   --timing-function: cubic-bezier(0.3, 0.5, 0, 1);
 
@@ -106,7 +106,7 @@
     --link-bg-hover-color: #34353799;
     --reblog-faded-color: #b190f141;
     --reply-to-text-color: var(--reply-to-color);
-    --reply-to-faded-color: #ffa60027;
+    --reply-to-faded-color: #ffa60017;
     --divider-color: rgba(255, 255, 255, 0.1);
     --bg-blur-color: #24252699;
     --backdrop-color: rgba(0, 0, 0, 0.5);
