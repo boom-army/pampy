@@ -17,13 +17,15 @@ function FollowRequestButtons({ accountID, onChange }) {
     <p class="follow-request-buttons">
       <button
         type="button"
-        disabled={uiState === 'loading'}
+        disabled={uiState === 'loading' || hasRelationship}
         onClick={() => {
           setUIState('loading');
           setRequestState('accept');
           (async () => {
             try {
-              const rel = await masto.v1.followRequests.authorize(accountID);
+              const rel = await masto.v1.followRequests
+                .$select(accountID)
+                .authorize();
               if (!rel?.followedBy) {
                 throw new Error('Follow request not accepted');
               }
@@ -40,14 +42,16 @@ function FollowRequestButtons({ accountID, onChange }) {
       </button>{' '}
       <button
         type="button"
-        disabled={uiState === 'loading'}
+        disabled={uiState === 'loading' || hasRelationship}
         class="light danger"
         onClick={() => {
           setUIState('loading');
           setRequestState('reject');
           (async () => {
             try {
-              const rel = await masto.v1.followRequests.reject(accountID);
+              const rel = await masto.v1.followRequests
+                .$select(accountID)
+                .reject();
               if (rel?.followedBy) {
                 throw new Error('Follow request not rejected');
               }

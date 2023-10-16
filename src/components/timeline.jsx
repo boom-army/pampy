@@ -14,9 +14,14 @@ import useScroll from '../utils/useScroll';
 
 import Icon from './icon';
 import Link from './link';
-import Loader from './loader';
 import NavMenu from './nav-menu';
 import Status from './status';
+
+const scrollIntoViewOptions = {
+  block: 'nearest',
+  inline: 'center',
+  behavior: 'smooth',
+};
 
 function Timeline({
   title,
@@ -112,7 +117,7 @@ function Timeline({
       }
       if (nextItem) {
         nextItem.focus();
-        nextItem.scrollIntoViewIfNeeded?.();
+        nextItem.scrollIntoView(scrollIntoViewOptions);
       }
     } else {
       // If active status is not in viewport, get the topmost status-link in viewport
@@ -122,7 +127,7 @@ function Timeline({
       });
       if (topmostItem) {
         topmostItem.focus();
-        topmostItem.scrollIntoViewIfNeeded?.();
+        topmostItem.scrollIntoView(scrollIntoViewOptions);
       }
     }
   });
@@ -151,7 +156,7 @@ function Timeline({
       }
       if (prevItem) {
         prevItem.focus();
-        prevItem.scrollIntoViewIfNeeded?.();
+        prevItem.scrollIntoView(scrollIntoViewOptions);
       }
     } else {
       // If active status is not in viewport, get the topmost status-link in viewport
@@ -161,7 +166,7 @@ function Timeline({
       });
       if (topmostItem) {
         topmostItem.focus();
-        topmostItem.scrollIntoViewIfNeeded?.();
+        topmostItem.scrollIntoView(scrollIntoViewOptions);
       }
     }
   });
@@ -413,7 +418,7 @@ function Timeline({
                     const isMiddle = i > 0 && i < items.length - 1;
                     const isSpoiler = item.sensitive && !!item.spoilerText;
                     const showCompact =
-                      (isSpoiler && i > 0) ||
+                      (!_differentAuthor && isSpoiler && i > 0) ||
                       (manyItems &&
                         isMiddle &&
                         (type === 'thread' ||

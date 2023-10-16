@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useSnapshot } from 'valtio';
 
 import logo from '../assets/logo.svg';
+
 import Icon from '../components/icon';
 import Link from '../components/link';
 import RelativeTime from '../components/relative-time';

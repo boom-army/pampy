@@ -14,7 +14,7 @@ import {
 } from 'preact/hooks';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { InView } from 'react-intersection-observer';
-import { matchPath, useParams, useSearchParams } from 'react-router-dom';
+import { matchPath, useSearchParams } from 'react-router-dom';
 import { useDebouncedCallback } from 'use-debounce';
 import { useSnapshot } from 'valtio';
 
@@ -53,6 +53,12 @@ function resetScrollPosition(id) {
   delete cachedStatusesMap[id];
   delete scrollPositions[id];
 }
+
+const scrollIntoViewOptions = {
+  block: 'nearest',
+  inline: 'center',
+  behavior: 'smooth',
+};
 
 function StatusPage(params) {
   const { id } = params;
@@ -94,7 +100,7 @@ function StatusPage(params) {
     if (!heroStatus && showMedia) {
       (async () => {
         try {
-          const status = await masto.v1.statuses.fetch(id);
+          const status = await masto.v1.statuses.$select(id).fetch();
           saveStatus(status, instance);
           setHeroStatus(status);
         } catch (err) {
@@ -229,12 +235,15 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
 
     (async () => {
       const heroFetch = () =>
-        pRetry(() => masto.v1.statuses.fetch(id), {
+        pRetry(() => masto.v1.statuses.$select(id).fetch(), {
           retries: 4,
         });
-      const contextFetch = pRetry(() => masto.v1.statuses.fetchContext(id), {
-        retries: 8,
-      });
+      const contextFetch = pRetry(
+        () => masto.v1.statuses.$select(id).context.fetch(),
+        {
+          retries: 8,
+        },
+      );
 
       const hasStatus = !!snapStates.statuses[sKey];
       let heroStatus = snapStates.statuses[sKey];
@@ -555,7 +564,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
       let nextStatus = allStatusLinks[activeStatusIndex + 1];
       if (nextStatus) {
         nextStatus.focus();
-        nextStatus.scrollIntoViewIfNeeded?.();
+        nextStatus.scrollIntoView(scrollIntoViewOptions);
       }
     } else {
       // If active status is not in viewport, get the topmost status-link in viewport
@@ -565,7 +574,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
       });
       if (topmostStatusLink) {
         topmostStatusLink.focus();
-        topmostStatusLink.scrollIntoViewIfNeeded?.();
+        topmostStatusLink.scrollIntoView(scrollIntoViewOptions);
       }
     }
   });
@@ -589,7 +598,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
       let prevStatus = allStatusLinks[activeStatusIndex - 1];
       if (prevStatus) {
         prevStatus.focus();
-        prevStatus.scrollIntoViewIfNeeded?.();
+        prevStatus.scrollIntoView(scrollIntoViewOptions);
       }
     } else {
       // If active status is not in viewport, get the topmost status-link in viewport
@@ -599,7 +608,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
       });
       if (topmostStatusLink) {
         topmostStatusLink.focus();
-        topmostStatusLink.scrollIntoViewIfNeeded?.();
+        topmostStatusLink.scrollIntoView(scrollIntoViewOptions);
       }
     }
   });
@@ -940,12 +949,13 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
                               setUIState('loading');
                               (async () => {
                                 try {
-                                  const results = await currentMasto.v2.search({
-                                    q: heroStatus.url,
-                                    type: 'statuses',
-                                    resolve: true,
-                                    limit: 1,
-                                  });
+                                  const results =
+                                    await currentMasto.v2.search.fetch({
+                                      q: heroStatus.url,
+                                      type: 'statuses',
+                                      resolve: true,
+                                      limit: 1,
+                                    });
                                   if (results.statuses.length) {
                                     const status = results.statuses[0];
                                     location.hash = currentInstance

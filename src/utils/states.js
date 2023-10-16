@@ -1,8 +1,8 @@
-import mem from 'mem';
 import { proxy, subscribe } from 'valtio';
 import { subscribeKey } from 'valtio/utils';
 
 import { api } from './api';
+import pmem from './pmem';
 import store from './store';
 
 const states = proxy({
@@ -18,7 +18,7 @@ const states = proxy({
   homeLast: null, // Last item in 'home' list
   homeLastFetchTime: null,
   notifications: [],
-  notificationsLast: store.account.get('notificationsLast') || null, // Last read notification
+  notificationsLast: null, // Last read notification
   notificationsNew: [],
   notificationsShowNew: false,
   notificationsLastFetchTime: null,
@@ -46,23 +46,18 @@ const states = proxy({
   showGenericAccounts: false,
   showMediaAlt: false,
   // Shortcuts
-  shortcuts: store.account.get('shortcuts') ?? [],
+  shortcuts: [],
   // Settings
   settings: {
-    autoRefresh: store.account.get('settings-autoRefresh') ?? false,
-    shortcutsViewMode: store.account.get('settings-shortcutsViewMode') ?? null,
-    shortcutsColumnsMode:
-      store.account.get('settings-shortcutsColumnsMode') ?? false,
-    boostsCarousel: store.account.get('settings-boostsCarousel') ?? true,
-    contentTranslation:
-      store.account.get('settings-contentTranslation') ?? true,
-    contentTranslationTargetLanguage:
-      store.account.get('settings-contentTranslationTargetLanguage') || null,
-    contentTranslationHideLanguages:
-      store.account.get('settings-contentTranslationHideLanguages') || [],
-    contentTranslationAutoInline:
-      store.account.get('settings-contentTranslationAutoInline') ?? false,
-    cloakMode: store.account.get('settings-cloakMode') ?? false,
+    autoRefresh: false,
+    shortcutsViewMode: null,
+    shortcutsColumnsMode: false,
+    boostsCarousel: true,
+    contentTranslation: true,
+    contentTranslationTargetLanguage: null,
+    contentTranslationHideLanguages: [],
+    contentTranslationAutoInline: false,
+    cloakMode: false,
   },
 });
 
@@ -212,7 +207,7 @@ export function threadifyStatus(status, propInstance) {
     if (!prevStatus) {
       if (fetchIndex++ > 3) throw 'Too many fetches for thread'; // Some people revive old threads
       await new Promise((r) => setTimeout(r, 500 * fetchIndex)); // Be nice to rate limits
-      // prevStatus = await masto.v1.statuses.fetch(inReplyToId);
+      // prevStatus = await masto.v1.statuses.$.select(inReplyToId).fetch();
       prevStatus = await fetchStatus(inReplyToId, masto);
       saveStatus(prevStatus, instance, { skipThreading: true });
     }
@@ -234,6 +229,6 @@ export function threadifyStatus(status, propInstance) {
     });
 }
 
-const fetchStatus = mem((statusID, masto) => {
-  return masto.v1.statuses.fetch(statusID);
+const fetchStatus = pmem((statusID, masto) => {
+  return masto.v1.statuses.$select(statusID).fetch();
 });
