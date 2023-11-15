@@ -117,9 +117,10 @@ export default function Modals() {
             instance={snapStates.showAccount?.instance}
             onClose={({ destination } = {}) => {
               states.showAccount = false;
-              if (destination) {
-                states.showAccounts = false;
-              }
+              // states.showGenericAccounts = false;
+              // if (destination) {
+              //   states.showAccounts = false;
+              // }
             }}
           />
         </Modal>
@@ -182,10 +183,8 @@ export default function Modals() {
       {!!snapStates.showMediaAlt && (
         <Modal
           class="light"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              states.showMediaAlt = false;
-            }
+          onClose={(e) => {
+            states.showMediaAlt = false;
           }}
         >
           <MediaAltModal

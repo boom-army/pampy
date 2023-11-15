@@ -24,7 +24,7 @@ export default function MediaAltModal({ alt, lang, onClose }) {
     );
 
   return (
-    <div class="sheet">
+    <div class="sheet" tabindex="-1">
       {!!onClose && (
         <button type="button" class="sheet-close outer" onClick={onClose}>
           <Icon icon="x" />
@@ -57,6 +57,7 @@ export default function MediaAltModal({ alt, lang, onClose }) {
         <p
           style={{
             whiteSpace: 'pre-wrap',
+            textWrap: 'pretty',
           }}
         >
           {alt}

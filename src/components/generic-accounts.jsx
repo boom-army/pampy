@@ -1,10 +1,11 @@
 import './generic-accounts.css';
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { InView } from 'react-intersection-observer';
 import { useSnapshot } from 'valtio';
 
 import states from '../utils/states';
+import useLocationChange from '../utils/useLocationChange';
 
 import AccountBlock from './account-block';
 import Icon from './icon';
@@ -15,6 +16,8 @@ export default function GenericAccounts({ onClose = () => {} }) {
   const [uiState, setUIState] = useState('default');
   const [accounts, setAccounts] = useState([]);
   const [showMore, setShowMore] = useState(false);
+
+  useLocationChange(onClose);
 
   if (!snapStates.showGenericAccounts) {
     return null;
@@ -53,15 +56,18 @@ export default function GenericAccounts({ onClose = () => {} }) {
     })();
   };
 
+  const firstLoad = useRef(true);
   useEffect(() => {
     if (staticAccounts?.length > 0) {
       setAccounts(staticAccounts);
     } else {
       loadAccounts(true);
+      firstLoad.current = false;
     }
   }, [staticAccounts, fetchAccounts]);
 
   useEffect(() => {
+    if (firstLoad.current) return;
     // reloadGenericAccounts contains value like {id: 'mute', counter: 1}
     // We only need to reload if the id matches
     if (snapStates.reloadGenericAccounts?.id === id) {

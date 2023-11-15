@@ -20,8 +20,14 @@
   --purple-color: blueviolet;
   --green-color: darkgreen;
   --orange-color: darkorange;
+  --orange-light-bg-color: color-mix(
+    in srgb,
+    var(--orange-color) 20%,
+    transparent
+  );
   --red-color: orangered;
   --pink-color: #CA2055;
+  --red-bg-color: color-mix(in lch, var(--red-color) 40%, transparent);
   --bg-color: #fff;
   --bg-faded-color: #f0f2f5;
   --bg-blur-color: #fff9;
@@ -56,7 +62,7 @@
   --divider-color: rgba(0, 0, 0, 0.1);
   --backdrop-color: rgba(0, 0, 0, 0.05);
   --backdrop-darker-color: rgba(0, 0, 0, 0.25);
-  --backdrop-solid-color: #ccc;
+  --backdrop-solid-color: #eee;
   --img-bg-color: rgba(128, 128, 128, 0.2);
   --loader-color: #1c1e2199;
   --comment-line-color: #e5e5e5;
@@ -65,6 +71,9 @@
   --close-button-bg-active-color: rgba(0, 0, 0, 0.2);
   --close-button-color: rgba(0, 0, 0, 0.5);
   --close-button-hover-color: rgba(0, 0, 0, 1);
+  --private-note-text-color: var(--text-color);
+  --private-note-bg-color: color-mix(in srgb, yellow 20%, var(--bg-color));
+  --private-note-border-color: rgba(0, 0, 0, 0.2);
 
   /* Video colors won't change based on color scheme */
   --media-fg-color: #f0f2f5;
@@ -115,7 +124,7 @@
     --divider-color: rgba(255, 255, 255, 0.1);
     --bg-blur-color: #24252699;
     --backdrop-color: rgba(0, 0, 0, 0.5);
-    --backdrop-solid-color: #333;
+    --backdrop-solid-color: #111;
     --loader-color: #f0f2f599;
     --comment-line-color: #565656;
     --drop-shadow-color: rgba(0, 0, 0, 0.5);
@@ -123,6 +132,7 @@
     --close-button-bg-active-color: rgba(255, 255, 255, 0.15);
     --close-button-color: rgba(255, 255, 255, 0.5);
     --close-button-hover-color: rgba(255, 255, 255, 1);
+    --private-note-border-color: rgba(255, 255, 255, 0.2);
   }
 }
 

@@ -98,31 +98,33 @@ function Welcome() {
           </section>
         </div>
       </div>
-      <hr />
-      <p>
-        <a href="https://github.com/boom-army/pampy" target="_blank">
-          Built
-        </a>{' '}
-        by{' '}
-        <a
-          href="https://social.boom.army/@harkl"
-          target="_blank"
-          onClick={(e) => {
-            e.preventDefault();
-            states.showAccount = 'harkl@social.boom.army';
-          }}
-        >
-          @harkl
-        </a>
-        .{' '}
-        <a
-          href="https://github.com/boom-army/pampy/blob/main/PRIVACY.MD"
-          target="_blank"
-        >
-          Privacy Policy
-        </a>
-        .
-      </p>
+      <footer>
+        <hr />
+        <p>
+          <a href="https://github.com/boom-army/pampy" target="_blank">
+            Forked
+          </a>{' '}
+          by{' '}
+          <a
+            href="https://social.boom.army/@harkl"
+            target="_blank"
+            onClick={(e) => {
+              e.preventDefault();
+              states.showAccount = 'harkl@social.boom.army';
+            }}
+          >
+            @harkl
+          </a>
+          .{' '}
+          <a
+            href="https://github.com/boom-army/pampy/blob/main/PRIVACY.MD"
+            target="_blank"
+          >
+            Privacy Policy
+          </a>
+          .
+        </p>
+      </footer>
     </main>
   );
 }

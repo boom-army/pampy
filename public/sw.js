@@ -165,7 +165,6 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     (async () => {
-      await event.notification.close();
       const clients = await self.clients.matchAll({
         type: 'window',
         includeUncontrolled: true,
@@ -180,12 +179,12 @@ self.addEventListener('notificationclick', (event) => {
         console.log('NOTIFICATION CLICK navigate', url);
         if (bestClient) {
           console.log('NOTIFICATION CLICK postMessage', bestClient);
+          bestClient.focus();
           bestClient.postMessage?.({
             type: 'notification',
             id: tag,
             accessToken: access_token,
           });
-          bestClient.focus();
         } else {
           console.log('NOTIFICATION CLICK openWindow', url);
           await self.clients.openWindow(url);
@@ -195,6 +194,7 @@ self.addEventListener('notificationclick', (event) => {
         console.log('NOTIFICATION CLICK openWindow', url);
         await self.clients.openWindow(url);
       }
+      await event.notification.close();
     })(),
   );
 });

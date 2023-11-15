@@ -1,3 +1,4 @@
+import { memo } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 
 const SIZES = {
@@ -27,6 +28,7 @@ export const ICONS = {
   'eye-open': () => import('@iconify-icons/mingcute/eye-2-line'),
   message: () => import('@iconify-icons/mingcute/mail-line'),
   comment: () => import('@iconify-icons/mingcute/chat-3-line'),
+  comment2: () => import('@iconify-icons/mingcute/comment-2-line'),
   home: () => import('@iconify-icons/mingcute/home-3-line'),
   notification: () => import('@iconify-icons/mingcute/notification-line'),
   follow: () => import('@iconify-icons/mingcute/user-follow-line'),
@@ -100,6 +102,8 @@ export const ICONS = {
   'account-warning': () => import('@iconify-icons/mingcute/user-warning-line'),
   keyboard: () => import('@iconify-icons/mingcute/keyboard-line'),
   cloud: () => import('@iconify-icons/mingcute/cloud-line'),
+  month: () => import('@iconify-icons/mingcute/calendar-month-line'),
+  media: () => import('@iconify-icons/mingcute/photo-album-line'),
 };
 
 function Icon({
@@ -132,9 +136,6 @@ function Icon({
       style={{
         width: `${iconSize}px`,
         height: `${iconSize}px`,
-        display: 'inline-block',
-        overflow: 'hidden',
-        lineHeight: 0,
         ...style,
       }}
     >
@@ -155,4 +156,4 @@ function Icon({
   );
 }
 
-export default Icon;
+export default memo(Icon);

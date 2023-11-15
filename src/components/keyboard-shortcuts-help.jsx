@@ -118,6 +118,15 @@ export default memo(function KeyboardShortcutsHelp() {
                   keys: <kbd>c</kbd>,
                 },
                 {
+                  action: 'Compose new post (new window)',
+                  className: 'insignificant',
+                  keys: (
+                    <>
+                      <kbd>Shift</kbd> + <kbd>c</kbd>
+                    </>
+                  ),
+                },
+                {
                   action: 'Send post',
                   keys: (
                     <>
@@ -135,8 +144,21 @@ export default memo(function KeyboardShortcutsHelp() {
                   keys: <kbd>r</kbd>,
                 },
                 {
-                  action: 'Favourite',
-                  keys: <kbd>f</kbd>,
+                  action: 'Reply (new window)',
+                  className: 'insignificant',
+                  keys: (
+                    <>
+                      <kbd>Shift</kbd> + <kbd>r</kbd>
+                    </>
+                  ),
+                },
+                {
+                  action: 'Like (favourite)',
+                  keys: (
+                    <>
+                      <kbd>l</kbd> or <kbd>f</kbd>
+                    </>
+                  ),
                 },
                 {
                   action: 'Boost',
@@ -150,9 +172,17 @@ export default memo(function KeyboardShortcutsHelp() {
                   action: 'Bookmark',
                   keys: <kbd>d</kbd>,
                 },
-              ].map(({ action, keys }) => (
+                {
+                  action: 'Toggle Cloak mode',
+                  keys: (
+                    <>
+                      <kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>k</kbd>
+                    </>
+                  ),
+                },
+              ].map(({ action, className, keys }) => (
                 <tr key={action}>
-                  <th>{action}</th>
+                  <th class={className}>{action}</th>
                   <td>{keys}</td>
                 </tr>
               ))}

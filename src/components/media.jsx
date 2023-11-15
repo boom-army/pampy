@@ -62,6 +62,7 @@ export const isMediaCaptionLong = mem((caption) =>
 );
 
 function Media({
+  class: className = '',
   media,
   to,
   lang,
@@ -130,6 +131,7 @@ function Media({
     enabled: pinchZoomEnabled,
     draggableUnZoomed: false,
     inertiaFriction: 0.9,
+    doubleTapZoomOutOnMaxScale: true,
     containerProps: {
       className: 'media-zoom',
       style: {
@@ -169,15 +171,24 @@ function Media({
   const maxAspectHeight =
     window.innerHeight * (orientation === 'portrait' ? 0.45 : 0.33);
   const maxHeight = orientation === 'portrait' ? 0 : 160;
-  const mediaStyles = {
-    '--width': `${width}px`,
-    '--height': `${height}px`,
-    // Calculate '--aspectWidth' based on aspect ratio calculated from '--width' and '--height', max height has to be 160px
-    '--aspectWidth': `${
-      (width / height) * Math.max(maxHeight, maxAspectHeight)
-    }px`,
-    aspectRatio: `${width} / ${height}`,
+  const averageColorStyle = {
+    '--average-color': rgbAverageColor && `rgb(${rgbAverageColor.join(',')})`,
   };
+  const mediaStyles =
+    width && height
+      ? {
+          '--width': `${width}px`,
+          '--height': `${height}px`,
+          // Calculate '--aspectWidth' based on aspect ratio calculated from '--width' and '--height', max height has to be 160px
+          '--aspectWidth': `${
+            (width / height) * Math.max(maxHeight, maxAspectHeight)
+          }px`,
+          aspectRatio: `${width} / ${height}`,
+          ...averageColorStyle,
+        }
+      : {
+          ...averageColorStyle,
+        };
 
   const longDesc = isMediaCaptionLong(description);
   const showInlineDesc =
@@ -229,7 +240,7 @@ function Media({
       <Figure>
         <Parent
           ref={parentRef}
-          class={`media media-image`}
+          class={`media media-image ${className}`}
           onClick={onClick}
           data-orientation={orientation}
           data-has-alt={!showInlineDesc}
@@ -240,6 +251,7 @@ function Media({
                   backgroundSize: imageSmallerThanParent
                     ? `${width}px ${height}px`
                     : undefined,
+                  ...averageColorStyle,
                 }
               : mediaStyles
           }
@@ -337,11 +349,13 @@ function Media({
     return (
       <Figure>
         <Parent
-          class={`media media-${isGIF ? 'gif' : 'video'} ${
+          class={`media ${className} media-${isGIF ? 'gif' : 'video'} ${
             autoGIFAnimate ? 'media-contain' : ''
           }`}
           data-orientation={orientation}
-          data-formatted-duration={formattedDuration}
+          data-formatted-duration={
+            !showOriginal ? formattedDuration : undefined
+          }
           data-label={isGIF && !showOriginal && !autoGIFAnimate ? 'GIF' : ''}
           data-has-alt={!showInlineDesc}
           // style={{
@@ -444,8 +458,10 @@ function Media({
     return (
       <Figure>
         <Parent
-          class="media media-audio"
-          data-formatted-duration={formattedDuration}
+          class={`media media-audio ${className}`}
+          data-formatted-duration={
+            !showOriginal ? formattedDuration : undefined
+          }
           data-has-alt={!showInlineDesc}
           onClick={onClick}
           style={!showOriginal && mediaStyles}

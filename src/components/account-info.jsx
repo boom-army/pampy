@@ -126,19 +126,14 @@ function AccountInfo({
   const { masto } = api({
     instance,
   });
-  const { masto: currentMasto } = api();
+  const { masto: currentMasto, instance: currentInstance } = api();
   const [uiState, setUIState] = useState('default');
   const isString = typeof account === 'string';
   const [info, setInfo] = useState(isString ? null : account);
 
-  const isSelf = useMemo(
-    () => account.id === store.session.get('currentAccount'),
-    [account?.id],
-  );
-
   const sameCurrentInstance = useMemo(
-    () => instance === api().instance,
-    [instance],
+    () => instance === currentInstance,
+    [instance, currentInstance],
   );
 
   useEffect(() => {
@@ -198,6 +193,37 @@ function AccountInfo({
     }
   }
 
+  const isSelf = useMemo(
+    () => id === store.session.get('currentAccount'),
+    [id],
+  );
+
+  useEffect(() => {
+    const infoHasEssentials = !!(
+      info?.id &&
+      info?.username &&
+      info?.acct &&
+      info?.avatar &&
+      info?.avatarStatic &&
+      info?.displayName &&
+      info?.url
+    );
+    if (isSelf && instance && infoHasEssentials) {
+      const accounts = store.local.getJSON('accounts');
+      let updated = false;
+      accounts.forEach((account) => {
+        if (account.info.id === info.id && account.instanceURL === instance) {
+          account.info = info;
+          updated = true;
+        }
+      });
+      if (updated) {
+        console.log('Updated account info', info);
+        store.local.setJSON('accounts', accounts);
+      }
+    }
+  }, [isSelf, info, instance]);
+
   const accountInstance = useMemo(() => {
     if (!url) return null;
     const domain = new URL(url).hostname;
@@ -223,9 +249,11 @@ function AccountInfo({
     // On first load, fetch familiar followers, merge to top of results' `value`
     // Remove dups on every fetch
     if (firstLoad) {
-      const familiarFollowers = await masto.v1.accounts
-        .familiarFollowers(id)
-        .fetch();
+      const familiarFollowers = await masto.v1.accounts.familiarFollowers.fetch(
+        {
+          id: [id],
+        },
+      );
       familiarFollowersCache.current = familiarFollowers[0].accounts;
       newValue = [
         ...familiarFollowersCache.current,
@@ -302,16 +330,18 @@ function AccountInfo({
     ({ relationship, currentID }) => {
       if (!relationship.following) {
         renderFamiliarFollowers(currentID);
-        if (!standalone) {
+        if (!standalone && statusesCount > 0) {
+          // Only render posting stats if not standalone and has posts
           renderPostingStats();
         }
       }
     },
-    [standalone, id],
+    [standalone, id, statusesCount],
   );
 
   return (
     <div
+      tabIndex="-1"
       class={`account-container  ${uiState === 'loading' ? 'skeleton' : ''}`}
       style={{
         '--header-color-1': headerCornerColors[0],
@@ -341,20 +371,39 @@ function AccountInfo({
           </header>
           <main>
             <div class="note">
-              <p>████████ ███████</p>
-              <p>███████████████ ███████████████</p>
+              <p>███████ ████ ████</p>
+              <p>████ ████████ ██████ █████████ ████ ██</p>
             </div>
-            <div class="stats">
-              <div>
-                <span>██</span> Followers
+            <div class="account-metadata-box">
+              <div class="profile-metadata">
+                <div class="profile-field">
+                  <b class="more-insignificant">███</b>
+                  <p>██████</p>
+                </div>
+                <div class="profile-field">
+                  <b class="more-insignificant">████</b>
+                  <p>███████████</p>
+                </div>
               </div>
-              <div>
-                <span>██</span> Following
+              <div class="stats">
+                <div>
+                  <span>██</span> Followers
+                </div>
+                <div>
+                  <span>██</span> Following
+                </div>
+                <div>
+                  <span>██</span> Posts
+                </div>
               </div>
-              <div>
-                <span>██</span> Posts
-              </div>
-              <div>Joined ██</div>
+            </div>
+            <div class="actions">
+              <span />
+              <span class="buttons">
+                <button type="button" title="More" class="plain" disabled>
+                  <Icon icon="more" size="l" alt="More" />
+                </button>
+              </span>
             </div>
           </main>
         </>
@@ -377,7 +426,7 @@ function AccountInfo({
                 />
               </div>
             )}
-            {header && !/missing\.png$/.test(header) && (
+            {!!header && !/missing\.png$/.test(header) && (
               <img
                 src={header}
                 alt=""
@@ -484,7 +533,8 @@ function AccountInfo({
                 internal={!standalone}
               />
             </header>
-            <main tabIndex="-1">
+            <div class="faux-header-bg" aria-hidden="true" />
+            <main>
               {!!memorial && <span class="tag">In Memoriam</span>}
               {!!bot && (
                 <span class="tag">
@@ -511,7 +561,7 @@ function AccountInfo({
                 class="note"
                 dir="auto"
                 onClick={handleContentLinks({
-                  instance,
+                  instance: currentInstance,
                 })}
                 dangerouslySetInnerHTML={{
                   __html: enhanceContent(note, { emojis }),
@@ -548,11 +598,13 @@ function AccountInfo({
                     tabIndex={0}
                     to={accountLink}
                     onClick={() => {
-                      states.showAccount = false;
-                      states.showGenericAccounts = {
-                        heading: 'Followers',
-                        fetchAccounts: fetchFollowers,
-                      };
+                      // states.showAccount = false;
+                      setTimeout(() => {
+                        states.showGenericAccounts = {
+                          heading: 'Followers',
+                          fetchAccounts: fetchFollowers,
+                        };
+                      }, 0);
                     }}
                   >
                     {!!familiarFollowers.length && (
@@ -579,11 +631,13 @@ function AccountInfo({
                     tabIndex={0}
                     to={accountLink}
                     onClick={() => {
-                      states.showAccount = false;
-                      states.showGenericAccounts = {
-                        heading: 'Following',
-                        fetchAccounts: fetchFollowing,
-                      };
+                      // states.showAccount = false;
+                      setTimeout(() => {
+                        states.showGenericAccounts = {
+                          heading: 'Following',
+                          fetchAccounts: fetchFollowing,
+                        };
+                      }, 0);
                     }}
                   >
                     <span title={followingCount}>
@@ -595,13 +649,13 @@ function AccountInfo({
                   <LinkOrDiv
                     class="insignificant"
                     to={accountLink}
-                    onClick={
-                      standalone
-                        ? undefined
-                        : () => {
-                            hideAllModals();
-                          }
-                    }
+                    // onClick={
+                    //   standalone
+                    //     ? undefined
+                    //     : () => {
+                    //         hideAllModals();
+                    //       }
+                    // }
                   >
                     <span title={statusesCount}>
                       {shortenNumber(statusesCount)}
@@ -624,9 +678,9 @@ function AccountInfo({
                 <LinkOrDiv
                   to={accountLink}
                   class="account-metadata-box"
-                  onClick={() => {
-                    states.showAccount = false;
-                  }}
+                  // onClick={() => {
+                  //   states.showAccount = false;
+                  // }}
                 >
                   <div class="shazam-container">
                     <div class="shazam-container-inner">
@@ -643,7 +697,9 @@ function AccountInfo({
                         >
                           <div>
                             {postingStats.daysSinceLastPost < 365
-                              ? `Last ${postingStats.total} posts in the past 
+                              ? `Last ${postingStats.total} post${
+                                  postingStats.total > 1 ? 's' : ''
+                                } in the past 
                       ${postingStats.daysSinceLastPost} day${
                                   postingStats.daysSinceLastPost > 1 ? 's' : ''
                                 }`
@@ -721,13 +777,15 @@ function AccountInfo({
                   </div>
                 </div>
               </div>
+            </main>
+            <footer>
               <RelatedActions
                 info={info}
                 instance={instance}
                 authenticated={authenticated}
                 onRelationshipChange={onRelationshipChange}
               />
-            </main>
+            </footer>
           </>
         )
       )}
@@ -770,6 +828,7 @@ function RelatedActions({
     requested,
     domainBlocking,
     endorsed,
+    note: privateNote,
   } = relationship || {};
 
   const [currentInfo, setCurrentInfo] = useState(null);
@@ -851,6 +910,7 @@ function RelatedActions({
 
   const [showTranslatedBio, setShowTranslatedBio] = useState(false);
   const [showAddRemoveLists, setShowAddRemoveLists] = useState(false);
+  const [showPrivateNoteModal, setShowPrivateNoteModal] = useState(false);
 
   return (
     <>
@@ -861,9 +921,11 @@ function RelatedActions({
           ) : !!lastStatusAt ? (
             <small class="insignificant">
               Last post:{' '}
-              {niceDateTime(lastStatusAt, {
-                hideTime: true,
-              })}
+              <span class="ib">
+                {niceDateTime(lastStatusAt, {
+                  hideTime: true,
+                })}
+              </span>
             </small>
           ) : (
             <span />
@@ -872,6 +934,19 @@ function RelatedActions({
           {blocking && <span class="tag danger">Blocked</span>}
         </span>{' '}
         <span class="buttons">
+          {!!privateNote && (
+            <button
+              type="button"
+              class="private-note-tag"
+              title="Private note"
+              onClick={() => {
+                setShowPrivateNoteModal(true);
+              }}
+              dir="auto"
+            >
+              <span>{privateNote}</span>
+            </button>
+          )}
           <Menu
             instanceRef={menuInstanceRef}
             portal={{
@@ -924,6 +999,16 @@ function RelatedActions({
                 >
                   <Icon icon="translate" />
                   <span>Translate bio</span>
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setShowPrivateNoteModal(true);
+                  }}
+                >
+                  <Icon icon="pencil" />
+                  <span>
+                    {privateNote ? 'Edit private note' : 'Add private note'}
+                  </span>
                 </MenuItem>
                 {/* Add/remove from lists is only possible if following the account */}
                 {following && (
@@ -1235,6 +1320,24 @@ function RelatedActions({
           />
         </Modal>
       )}
+      {!!showPrivateNoteModal && (
+        <Modal
+          class="light"
+          onClose={() => {
+            setShowPrivateNoteModal(false);
+          }}
+        >
+          <PrivateNoteSheet
+            account={info}
+            note={privateNote}
+            onRelationshipChange={(relationship) => {
+              setRelationship(relationship);
+              // onRelationshipChange({ relationship, currentID: accountID.current });
+            }}
+            onClose={() => setShowPrivateNoteModal(false)}
+          />
+        </Modal>
+      )}
     </>
   );
 }
@@ -1313,6 +1416,7 @@ function AddRemoveListsSheet({ accountID, onClose }) {
     (async () => {
       try {
         const lists = await masto.v1.lists.list();
+        lists.sort((a, b) => a.title.localeCompare(b.title));
         const listsContainingAccount = await masto.v1.accounts
           .$select(accountID)
           .lists.list();
@@ -1428,6 +1532,97 @@ function AddRemoveListsSheet({ accountID, onClose }) {
           />
         </Modal>
       )}
+    </div>
+  );
+}
+
+function PrivateNoteSheet({
+  account,
+  note: initialNote,
+  onRelationshipChange = () => {},
+  onClose = () => {},
+}) {
+  const { masto } = api();
+  const [uiState, setUIState] = useState('default');
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    let timer;
+    if (textareaRef.current && !initialNote) {
+      timer = setTimeout(() => {
+        textareaRef.current.focus?.();
+      }, 100);
+    }
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return (
+    <div class="sheet" id="private-note-container">
+      {!!onClose && (
+        <button type="button" class="sheet-close" onClick={onClose}>
+          <Icon icon="x" />
+        </button>
+      )}
+      <header>
+        <b>Private note about @{account?.username || account?.acct}</b>
+      </header>
+      <main>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const note = formData.get('note');
+            if (note?.trim() !== initialNote?.trim()) {
+              setUIState('loading');
+              (async () => {
+                try {
+                  const newRelationship = await masto.v1.accounts
+                    .$select(account?.id)
+                    .note.create({
+                      comment: note,
+                    });
+                  console.log('updated relationship', newRelationship);
+                  setUIState('default');
+                  onRelationshipChange(newRelationship);
+                  onClose();
+                } catch (e) {
+                  console.error(e);
+                  setUIState('error');
+                  alert(e?.message || 'Unable to update private note.');
+                }
+              })();
+            }
+          }}
+        >
+          <textarea
+            ref={textareaRef}
+            name="note"
+            disabled={uiState === 'loading'}
+          >
+            {initialNote}
+          </textarea>
+          <footer>
+            <button
+              type="button"
+              class="light"
+              disabled={uiState === 'loading'}
+              onClick={() => {
+                onClose?.();
+              }}
+            >
+              Cancel
+            </button>
+            <span>
+              <Loader abrupt hidden={uiState !== 'loading'} />
+              <button disabled={uiState === 'loading'} type="submit">
+                Save &amp; close
+              </button>
+            </span>
+          </footer>
+        </form>
+      </main>
     </div>
   );
 }
