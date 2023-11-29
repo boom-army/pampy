@@ -5,6 +5,7 @@ import equal from 'fast-deep-equal';
 import { forwardRef } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { substring } from 'runes2';
 import stringLength from 'string-length';
 import { uid } from 'uid/single';
 import { useDebouncedCallback, useThrottledCallback } from 'use-debounce';
@@ -107,20 +108,20 @@ function countableText(inputText) {
 // https://github.com/mastodon/mastodon/blob/c03bd2a238741a012aa4b98dc4902d6cf948ab63/app/models/account.rb#L69
 const USERNAME_RE = /[a-z0-9_]+([a-z0-9_.-]+[a-z0-9_]+)?/i;
 const MENTION_RE = new RegExp(
-  `(?<![=\\/\\w])@((${USERNAME_RE.source})(?:@[\\w.-]+[\\w]+)?)`,
+  `(^|[^=\\/\\w])(@${USERNAME_RE.source}(?:@[\\w.-]+[\\w]+)?)`,
   'ig',
 );
 
 // AI-generated, all other regexes are too complicated
 const HASHTAG_RE = new RegExp(
-  `(?<![=\\/\\w])#([a-z0-9_]+([a-z0-9_.-]+[a-z0-9_]+)?)(?![\\/\\w])`,
+  `(^|[^=\\/\\w])(#[a-z0-9_]+([a-z0-9_.-]+[a-z0-9_]+)?)(?![\\/\\w])`,
   'ig',
 );
 
 // https://github.com/mastodon/mastodon/blob/23e32a4b3031d1da8b911e0145d61b4dd47c4f96/app/models/custom_emoji.rb#L31
 const SHORTCODE_RE_FRAGMENT = '[a-zA-Z0-9_]{2,}';
 const SCAN_RE = new RegExp(
-  `(?<=[^A-Za-z0-9_:\\n]|^):(${SHORTCODE_RE_FRAGMENT}):(?=[^A-Za-z0-9_:]|$)`,
+  `([^A-Za-z0-9_:\\n]|^)(:${SHORTCODE_RE_FRAGMENT}:)(?=[^A-Za-z0-9_:]|$)`,
   'g',
 );
 
@@ -131,25 +132,27 @@ function highlightText(text, { maxCharacters = Infinity }) {
   const { composerCharacterCount } = states;
   let leftoverHTML = '';
   if (composerCharacterCount > maxCharacters) {
-    const leftoverCount = composerCharacterCount - maxCharacters;
+    // NOTE: runes2 substring considers surrogate pairs
+    // const leftoverCount = composerCharacterCount - maxCharacters;
     // Highlight exceeded characters
     leftoverHTML =
       '<mark class="compose-highlight-exceeded">' +
-      html.slice(-leftoverCount) +
+      // html.slice(-leftoverCount) +
+      substring(html, maxCharacters) +
       '</mark>';
-    html = html.slice(0, -leftoverCount);
+    // html = html.slice(0, -leftoverCount);
+    html = substring(html, 0, maxCharacters);
+    return html + leftoverHTML;
   }
 
-  html = html
+  return html
     .replace(urlRegexObj, '$2<mark class="compose-highlight-url">$3</mark>') // URLs
-    .replace(MENTION_RE, '<mark class="compose-highlight-mention">$&</mark>') // Mentions
-    .replace(HASHTAG_RE, '<mark class="compose-highlight-hashtag">#$1</mark>') // Hashtags
+    .replace(MENTION_RE, '$1<mark class="compose-highlight-mention">$2</mark>') // Mentions
+    .replace(HASHTAG_RE, '$1<mark class="compose-highlight-hashtag">$2</mark>') // Hashtags
     .replace(
       SCAN_RE,
-      '<mark class="compose-highlight-emoji-shortcode">$&</mark>',
+      '$1<mark class="compose-highlight-emoji-shortcode">$2</mark>',
     ); // Emoji shortcodes
-
-  return html + leftoverHTML;
 }
 
 function Compose({
@@ -1474,8 +1477,10 @@ const Textarea = forwardRef((props, ref) => {
     if (!textarea) return;
     const resizeObserver = new ResizeObserver(() => {
       // Get height of textarea, set height to textExpander
-      const { height } = textarea.getBoundingClientRect();
-      textExpanderRef.current.style.height = height + 'px';
+      if (textExpanderRef.current) {
+        const { height } = textarea.getBoundingClientRect();
+        textExpanderRef.current.style.height = height + 'px';
+      }
     });
     resizeObserver.observe(textarea);
   }, []);
@@ -1536,6 +1541,7 @@ const Textarea = forwardRef((props, ref) => {
                     target.setRangeText('', pos, selectionStart);
                   }
                   autoResizeTextarea(target);
+                  target.dispatchEvent(new Event('input'));
                 }
               }
             } catch (e) {
@@ -1543,6 +1549,7 @@ const Textarea = forwardRef((props, ref) => {
               console.error(e);
             }
           }
+          composeHighlightRef.current.scrollTop = target.scrollTop;
         }}
         onInput={(e) => {
           const { target } = e;

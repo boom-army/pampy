@@ -23,6 +23,7 @@ import Icon from '../components/icon';
 import Link from '../components/link';
 import Loader from '../components/loader';
 import MediaModal from '../components/media-modal';
+import Menu2 from '../components/menu2';
 import NameText from '../components/name-text';
 import RelativeTime from '../components/relative-time';
 import Status from '../components/status';
@@ -809,7 +810,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
               />
               {ancestor && isThread && repliesCount > 1 && (
                 <div class="replies-link">
-                  <Icon icon="comment" />{' '}
+                  <Icon icon="comment2" />{' '}
                   <span title={repliesCount}>
                     {shortenNumber(repliesCount)}
                   </span>
@@ -1034,7 +1035,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
             >
               <Icon icon="layout4" size="l" />
             </button>
-            <Menu
+            <Menu2
               align="end"
               portal={{
                 // Need this, else the menu click will cause scroll jump
@@ -1099,7 +1100,7 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
               <MenuDivider />
               <MenuHeader className="plain">Experimental</MenuHeader>
               <MenuItem
-                disabled={postSameInstance}
+                disabled={!postInstance || postSameInstance}
                 onClick={() => {
                   const statusURL = getInstanceStatusURL(heroStatus.url);
                   if (statusURL) {
@@ -1111,10 +1112,18 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
               >
                 <Icon icon="transfer" />
                 <small class="menu-double-lines">
-                  Switch to post's instance (<b>{postInstance}</b>)
+                  Switch to post's instance
+                  {postInstance ? (
+                    <>
+                      {' '}
+                      (<b>{postInstance}</b>)
+                    </>
+                  ) : (
+                    ''
+                  )}
                 </small>
               </MenuItem>
-            </Menu>
+            </Menu2>
             <Link class="button plain deck-close" to={closeLink}>
               <Icon icon="x" size="xl" />
             </Link>
@@ -1136,6 +1145,10 @@ function StatusThread({ id, closeLink = '/', instance: propInstance }) {
                 disabled={uiState === 'loading'}
                 onClick={() => setLimit((l) => l + LIMIT)}
                 style={{ marginBlockEnd: '6em' }}
+                data-state-post-ids={statuses
+                  .slice(limit)
+                  .map((s) => statusKey(s.id, instance))
+                  .join(' ')}
               >
                 <div class="ib avatars-bunch">
                   {/* show avatars for first 5 statuses */}
@@ -1318,7 +1331,7 @@ function SubComments({
               />
               {!r.replies?.length && r.repliesCount > 0 && (
                 <div class="replies-link">
-                  <Icon icon="comment" />{' '}
+                  <Icon icon="comment2" />{' '}
                   <span title={r.repliesCount}>
                     {shortenNumber(r.repliesCount)}
                   </span>
