@@ -21,11 +21,10 @@ export default function HttpRoute() {
   useLayoutEffect(() => {
     setUIState('loading');
     (async () => {
-      const { instance, id } = statusObject;
-      const { masto } = api({ instance });
-
       // Check if status returns 200
       try {
+        const { instance, id } = statusObject;
+        const { masto } = api({ instance });
         const status = await masto.v1.statuses.$select(id).fetch();
         if (status) {
           window.location.hash = statusURL + '?view=full';
@@ -38,16 +37,20 @@ export default function HttpRoute() {
         const { masto: currentMasto, instance: currentInstance } = api();
         const result = await currentMasto.v2.search.fetch({
           q: url,
-          type: 'statuses',
           limit: 1,
           resolve: true,
         });
         if (result.statuses.length) {
           const status = result.statuses[0];
           window.location.hash = `/${currentInstance}/s/${status.id}?view=full`;
-        } else {
+        } else if (result.accounts.length) {
+          const account = result.accounts[0];
+          window.location.hash = `/${currentInstance}/a/${account.id}`;
+        } else if (statusURL) {
           // Fallback to original URL, which will probably show error
           window.location.hash = statusURL + '?view=full';
+        } else {
+          setUIState('error');
         }
       }
     })();

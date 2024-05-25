@@ -10,6 +10,7 @@ assignees: ''
 **Describe the bug**
 A clear and concise description of what the bug is.
 - Which site: [e.g. dev.social.boom.army OR social.boom.army]
+- Which site version: [On Boom, go to Settings -> About]
 - Which instance: [e.g. mastodon.social]
 
 **To Reproduce**

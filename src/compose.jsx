@@ -3,10 +3,15 @@ import './index.css';
 import './app.css';
 
 import { render } from 'preact';
+import { lazy } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 
-import Compose from './components/compose';
+import IntlSegmenterSuspense from './components/intl-segmenter-suspense';
+import { initStates } from './utils/states';
+// import Compose from './components/compose';
 import useTitle from './utils/useTitle';
+
+const Compose = lazy(() => import('./components/compose'));
 
 if (window.opener) {
   console = window.opener.console;
@@ -26,6 +31,10 @@ function App() {
         }`
       : 'Compose',
   );
+
+  useEffect(() => {
+    initStates();
+  }, []);
 
   useEffect(() => {
     if (uiState === 'closed') {
@@ -57,23 +66,25 @@ function App() {
   console.debug('OPEN COMPOSE');
 
   return (
-    <Compose
-      editStatus={editStatus}
-      replyToStatus={replyToStatus}
-      draftStatus={draftStatus}
-      standalone
-      hasOpener={window.opener}
-      onClose={(results) => {
-        const { newStatus, fn = () => {} } = results || {};
-        try {
-          if (newStatus) {
-            window.opener.__STATES__.reloadStatusPage++;
-          }
-          fn();
-          setUIState('closed');
-        } catch (e) {}
-      }}
-    />
+    <IntlSegmenterSuspense>
+      <Compose
+        editStatus={editStatus}
+        replyToStatus={replyToStatus}
+        draftStatus={draftStatus}
+        standalone
+        hasOpener={window.opener}
+        onClose={(results) => {
+          const { newStatus, fn = () => {} } = results || {};
+          try {
+            if (newStatus) {
+              window.opener.__STATES__.reloadStatusPage++;
+            }
+            fn();
+            setUIState('closed');
+          } catch (e) {}
+        }}
+      />
+    </IntlSegmenterSuspense>
   );
 }
 

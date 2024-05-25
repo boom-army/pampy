@@ -2,21 +2,31 @@ import preact from '@preact/preset-vite';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import { resolve } from 'path';
+import { uid } from 'uid/single';
 import { defineConfig, loadEnv, splitVendorChunkPlugin } from 'vite';
 import generateFile from 'vite-plugin-generate-file';
 import htmlPlugin from 'vite-plugin-html-config';
 import { VitePWA } from 'vite-plugin-pwa';
 import removeConsole from 'vite-plugin-remove-console';
 
+const allowedEnvPrefixes = ['VITE_', 'PHANPY_'];
 const { NODE_ENV } = process.env;
 const {
-  VITE_CLIENT_NAME: CLIENT_NAME,
-  VITE_CLIENT_ID: CLIENT_ID,
-  VITE_APP_ERROR_LOGGING: ERROR_LOGGING,
-} = loadEnv('production', process.cwd());
+  PHANPY_CLIENT_NAME: CLIENT_NAME,
+  PHANPY_APP_ERROR_LOGGING: ERROR_LOGGING,
+} = loadEnv('production', process.cwd(), allowedEnvPrefixes);
 
 const now = new Date();
-const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+let commitHash;
+let fakeCommitHash = false;
+try {
+  commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+} catch (error) {
+  // If error, means git is not installed or not a git repo (could be downloaded instead of git cloned)
+  // Fallback to random hash which should be different on every build run 🤞
+  commitHash = uid();
+  fakeCommitHash = true;
+}
 
 const rollbarCode = fs.readFileSync(
   resolve(__dirname, './rollbar.js'),
@@ -26,13 +36,19 @@ const rollbarCode = fs.readFileSync(
 // https://vitejs.dev/config/
 export default defineConfig({
   base: './',
+  envPrefix: allowedEnvPrefixes,
+  appType: 'mpa',
   mode: NODE_ENV,
   define: {
     __BUILD_TIME__: JSON.stringify(now),
     __COMMIT_HASH__: JSON.stringify(commitHash),
+    __FAKE_COMMIT_HASH__: fakeCommitHash,
   },
   server: {
     host: true,
+  },
+  css: {
+    preprocessorMaxWorkers: 1,
   },
   plugins: [
     preact(),
@@ -55,7 +71,6 @@ export default defineConfig({
     ]),
     VitePWA({
       manifest: {
-        id: CLIENT_ID,
         name: CLIENT_NAME,
         short_name: CLIENT_NAME,
         description: 'Decentralized Social Media for Solana Blockchain',
@@ -78,6 +93,7 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        categories: ['social', 'news'],
       },
       strategies: 'injectManifest',
       injectRegister: 'inline',
@@ -93,6 +109,7 @@ export default defineConfig({
   ],
   build: {
     sourcemap: true,
+    cssCodeSplit: false,
     rollupOptions: {
       treeshake: false,
       input: {
@@ -100,6 +117,9 @@ export default defineConfig({
         compose: resolve(__dirname, 'compose/index.html'),
       },
       output: {
+        // manualChunks: {
+        //   'intl-segmenter-polyfill': ['@formatjs/intl-segmenter/polyfill'],
+        // },
         chunkFileNames: (chunkInfo) => {
           const { facadeModuleId } = chunkInfo;
           if (facadeModuleId && facadeModuleId.includes('icon')) {

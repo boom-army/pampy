@@ -17,7 +17,7 @@ export default memo(function KeyboardShortcutsHelp() {
   }
 
   useHotkeys(
-    '?, shift+?',
+    '?, shift+?, shift+slash',
     (e) => {
       console.log('help');
       states.showKeyboardShortcutsHelp = true;
@@ -30,24 +30,10 @@ export default memo(function KeyboardShortcutsHelp() {
     },
   );
 
-  const escRef = useHotkeys('esc', onClose, []);
-
   return (
     !!snapStates.showKeyboardShortcutsHelp && (
-      <Modal
-        class="light"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            onClose();
-          }
-        }}
-      >
-        <div
-          id="keyboard-shortcuts-help-container"
-          class="sheet"
-          tabindex="-1"
-          ref={escRef}
-        >
+      <Modal onClose={onClose}>
+        <div id="keyboard-shortcuts-help-container" class="sheet" tabindex="-1">
           <button type="button" class="sheet-close" onClick={onClose}>
             <Icon icon="x" />
           </button>
@@ -86,6 +72,10 @@ export default memo(function KeyboardShortcutsHelp() {
                   ),
                 },
                 {
+                  action: 'Load new posts',
+                  keys: <kbd>.</kbd>,
+                },
+                {
                   action: 'Open post details',
                   keys: (
                     <>
@@ -94,7 +84,13 @@ export default memo(function KeyboardShortcutsHelp() {
                   ),
                 },
                 {
-                  action: 'Toggle expanded/collapsed thread',
+                  action: (
+                    <>
+                      Expand content warning or
+                      <br />
+                      toggle expanded/collapsed thread
+                    </>
+                  ),
                   keys: <kbd>x</kbd>,
                 },
                 {

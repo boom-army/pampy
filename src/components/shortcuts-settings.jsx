@@ -13,9 +13,13 @@ import multiColumnUrl from '../assets/multi-column.svg';
 import tabMenuBarUrl from '../assets/tab-menu-bar.svg';
 
 import { api } from '../utils/api';
+import { fetchFollowedTags } from '../utils/followed-tags';
+import { getLists, getListTitle } from '../utils/lists';
 import pmem from '../utils/pmem';
 import showToast from '../utils/show-toast';
 import states from '../utils/states';
+import store from '../utils/store';
+import { getCurrentAccountID } from '../utils/store-utils';
 
 import AsyncText from './AsyncText';
 import Icon from './icon';
@@ -31,17 +35,17 @@ const TYPES = [
   'list',
   'public',
   'trending',
-  // NOTE: Hide for now
-  // 'search', // Search on Mastodon ain't great
-  // 'account-statuses', // Need @acct search first
+  'search',
   'hashtag',
   'bookmarks',
   'favourites',
+  // NOTE: Hide for now
+  // 'account-statuses', // Need @acct search first
 ];
 const TYPE_TEXT = {
   following: 'Home / Following',
   notifications: 'Notifications',
-  list: 'List',
+  list: 'Lists',
   public: 'Public (Local / Federated)',
   search: 'Search',
   'account-statuses': 'Account',
@@ -56,6 +60,7 @@ const TYPE_PARAMS = {
     {
       text: 'List ID',
       name: 'id',
+      notRequired: true,
     },
   ],
   public: [
@@ -86,6 +91,8 @@ const TYPE_PARAMS = {
       text: 'Search term',
       name: 'query',
       type: 'text',
+      placeholder: 'Optional, unless for multi-column mode',
+      notRequired: true,
     },
   ],
   'account-statuses': [
@@ -118,10 +125,6 @@ const TYPE_PARAMS = {
     },
   ],
 };
-const fetchListTitle = pmem(async ({ id }) => {
-  const list = await api().masto.v1.lists.$select(id).fetch();
-  return list.title;
-});
 const fetchAccountTitle = pmem(async ({ id }) => {
   const account = await api().masto.v1.accounts.$select(id).fetch();
   return account.username || account.acct || account.displayName;
@@ -146,17 +149,18 @@ export const SHORTCUTS_META = {
     icon: 'notification',
   },
   list: {
-    id: 'list',
-    title: fetchListTitle,
-    path: ({ id }) => `/l/${id}`,
+    id: ({ id }) => (id ? 'list' : 'lists'),
+    title: ({ id }) => (id ? getListTitle(id) : 'Lists'),
+    path: ({ id }) => (id ? `/l/${id}` : '/l'),
     icon: 'list',
+    excludeViewMode: ({ id }) => (!id ? ['multi-column'] : []),
   },
   public: {
     id: 'public',
     title: ({ local }) => (local ? 'Local' : 'Federated'),
     subtitle: ({ instance }) => instance || api().instance,
     path: ({ local, instance }) => `/${instance}/p${local ? '/l' : ''}`,
-    icon: ({ local }) => (local ? 'group' : 'earth'),
+    icon: ({ local }) => (local ? 'building' : 'earth'),
   },
   trending: {
     id: 'trending',
@@ -167,9 +171,13 @@ export const SHORTCUTS_META = {
   },
   search: {
     id: 'search',
-    title: ({ query }) => query,
-    path: ({ query }) => `/search?q=${query}`,
+    title: ({ query }) => (query ? `“${query}”` : 'Search'),
+    path: ({ query }) =>
+      query
+        ? `/search?q=${encodeURIComponent(query)}&type=statuses`
+        : '/search',
     icon: 'search',
+    excludeViewMode: ({ query }) => (!query ? ['multi-column'] : []),
   },
   'account-statuses': {
     id: 'account-statuses',
@@ -272,80 +280,93 @@ function ShortcutsSettings({ onClose }) {
           })}
         </div>
         {shortcuts.length > 0 ? (
-          <ol class="shortcuts-list" ref={shortcutsListParent}>
-            {shortcuts.filter(Boolean).map((shortcut, i) => {
-              // const key = i + Object.values(shortcut);
-              const key = Object.values(shortcut).join('-');
-              const { type } = shortcut;
-              if (!SHORTCUTS_META[type]) return null;
-              let { icon, title, subtitle } = SHORTCUTS_META[type];
-              if (typeof title === 'function') {
-                title = title(shortcut, i);
-              }
-              if (typeof subtitle === 'function') {
-                subtitle = subtitle(shortcut, i);
-              }
-              if (typeof icon === 'function') {
-                icon = icon(shortcut, i);
-              }
-              return (
-                <li key={key}>
-                  <Icon icon={icon} />
-                  <span class="shortcut-text">
-                    <AsyncText>{title}</AsyncText>
-                    {subtitle && (
-                      <>
-                        {' '}
-                        <small class="ib insignificant">{subtitle}</small>
-                      </>
-                    )}
-                  </span>
-                  <span class="shortcut-actions">
-                    <button
-                      type="button"
-                      class="plain small"
-                      disabled={i === 0}
-                      onClick={() => {
-                        const shortcutsArr = Array.from(states.shortcuts);
-                        if (i > 0) {
-                          const temp = states.shortcuts[i - 1];
-                          shortcutsArr[i - 1] = shortcut;
-                          shortcutsArr[i] = temp;
-                          states.shortcuts = shortcutsArr;
-                        }
-                      }}
-                    >
-                      <Icon icon="arrow-up" alt="Move up" />
-                    </button>
-                    <button
-                      type="button"
-                      class="plain small"
-                      disabled={i === shortcuts.length - 1}
-                      onClick={() => {
-                        const shortcutsArr = Array.from(states.shortcuts);
-                        if (i < states.shortcuts.length - 1) {
-                          const temp = states.shortcuts[i + 1];
-                          shortcutsArr[i + 1] = shortcut;
-                          shortcutsArr[i] = temp;
-                          states.shortcuts = shortcutsArr;
-                        }
-                      }}
-                    >
-                      <Icon icon="arrow-down" alt="Move down" />
-                    </button>
-                    <button
-                      type="button"
-                      class="plain small"
-                      onClick={() => {
-                        setShowForm({
-                          shortcut,
-                          shortcutIndex: i,
-                        });
-                      }}
-                    >
-                      <Icon icon="pencil" alt="Edit" />
-                    </button>
-                    {/* <button
+          <>
+            <ol class="shortcuts-list" ref={shortcutsListParent}>
+              {shortcuts.filter(Boolean).map((shortcut, i) => {
+                // const key = i + Object.values(shortcut);
+                const key = Object.values(shortcut).join('-');
+                const { type } = shortcut;
+                if (!SHORTCUTS_META[type]) return null;
+                let { icon, title, subtitle, excludeViewMode } =
+                  SHORTCUTS_META[type];
+                if (typeof title === 'function') {
+                  title = title(shortcut, i);
+                }
+                if (typeof subtitle === 'function') {
+                  subtitle = subtitle(shortcut, i);
+                }
+                if (typeof icon === 'function') {
+                  icon = icon(shortcut, i);
+                }
+                if (typeof excludeViewMode === 'function') {
+                  excludeViewMode = excludeViewMode(shortcut, i);
+                }
+                const excludedViewMode = excludeViewMode?.includes(
+                  snapStates.settings.shortcutsViewMode,
+                );
+                return (
+                  <li key={key}>
+                    <Icon icon={icon} />
+                    <span class="shortcut-text">
+                      <AsyncText>{title}</AsyncText>
+                      {subtitle && (
+                        <>
+                          {' '}
+                          <small class="ib insignificant">{subtitle}</small>
+                        </>
+                      )}
+                      {excludedViewMode && (
+                        <span class="tag">
+                          Not available in current view mode
+                        </span>
+                      )}
+                    </span>
+                    <span class="shortcut-actions">
+                      <button
+                        type="button"
+                        class="plain small"
+                        disabled={i === 0}
+                        onClick={() => {
+                          const shortcutsArr = Array.from(states.shortcuts);
+                          if (i > 0) {
+                            const temp = states.shortcuts[i - 1];
+                            shortcutsArr[i - 1] = shortcut;
+                            shortcutsArr[i] = temp;
+                            states.shortcuts = shortcutsArr;
+                          }
+                        }}
+                      >
+                        <Icon icon="arrow-up" alt="Move up" />
+                      </button>
+                      <button
+                        type="button"
+                        class="plain small"
+                        disabled={i === shortcuts.length - 1}
+                        onClick={() => {
+                          const shortcutsArr = Array.from(states.shortcuts);
+                          if (i < states.shortcuts.length - 1) {
+                            const temp = states.shortcuts[i + 1];
+                            shortcutsArr[i + 1] = shortcut;
+                            shortcutsArr[i] = temp;
+                            states.shortcuts = shortcutsArr;
+                          }
+                        }}
+                      >
+                        <Icon icon="arrow-down" alt="Move down" />
+                      </button>
+                      <button
+                        type="button"
+                        class="plain small"
+                        onClick={() => {
+                          setShowForm({
+                            shortcut,
+                            shortcutIndex: i,
+                          });
+                        }}
+                      >
+                        <Icon icon="pencil" alt="Edit" />
+                      </button>
+                      {/* <button
                       type="button"
                       class="plain small"
                       onClick={() => {
@@ -354,14 +375,28 @@ function ShortcutsSettings({ onClose }) {
                     >
                       <Icon icon="x" alt="Remove" />
                     </button> */}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+            {shortcuts.length === 1 &&
+              snapStates.settings.shortcutsViewMode !== 'float-button' && (
+                <div class="ui-state insignificant">
+                  <Icon icon="info" />{' '}
+                  <small>
+                    Add more than one shortcut/column to make this work.
+                  </small>
+                </div>
+              )}
+          </>
         ) : (
           <div class="ui-state insignificant">
-            <p>No shortcuts yet. Tap on the Add shortcut button.</p>
+            <p>
+              {snapStates.settings.shortcutsViewMode === 'multi-column'
+                ? 'No columns yet. Tap on the Add column button.'
+                : 'No shortcuts yet. Tap on the Add shortcut button.'}
+            </p>
             <p>
               Not sure what to add?
               <br />
@@ -388,7 +423,9 @@ function ShortcutsSettings({ onClose }) {
         )}
         <p class="insignificant">
           {shortcuts.length >= SHORTCUTS_LIMIT &&
-            `Max ${SHORTCUTS_LIMIT} shortcuts`}
+            (snapStates.settings.shortcutsViewMode === 'multi-column'
+              ? `Max ${SHORTCUTS_LIMIT} columns`
+              : `Max ${SHORTCUTS_LIMIT} shortcuts`)}
         </p>
         <p
           style={{
@@ -409,13 +446,17 @@ function ShortcutsSettings({ onClose }) {
             disabled={shortcuts.length >= SHORTCUTS_LIMIT}
             onClick={() => setShowForm(true)}
           >
-            <Icon icon="plus" /> <span>Add shortcut</span>
+            <Icon icon="plus" />{' '}
+            <span>
+              {snapStates.settings.shortcutsViewMode === 'multi-column'
+                ? 'Add column…'
+                : 'Add shortcut…'}
+            </span>
           </button>
         </p>
       </main>
       {showForm && (
         <Modal
-          class="light"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowForm(false);
@@ -439,7 +480,6 @@ function ShortcutsSettings({ onClose }) {
       )}
       {showImportExport && (
         <Modal
-          class="light"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowImportExport(false);
@@ -456,16 +496,11 @@ function ShortcutsSettings({ onClose }) {
   );
 }
 
-const FETCH_MAX_AGE = 1000 * 60; // 1 minute
-const fetchLists = pmem(
-  () => {
-    const { masto } = api();
-    return masto.v1.lists.list();
-  },
-  {
-    maxAge: FETCH_MAX_AGE,
-  },
-);
+const FORM_NOTES = {
+  list: `Specific list is optional. For multi-column mode, list is required, else the column will not be shown.`,
+  search: `For multi-column mode, search term is required, else the column will not be shown.`,
+  hashtag: 'Multiple hashtags are supported. Space-separated.',
+};
 
 function ShortcutForm({
   onSubmit,
@@ -487,8 +522,7 @@ function ShortcutForm({
       if (currentType !== 'list') return;
       try {
         setUIState('loading');
-        const lists = await fetchLists();
-        lists.sort((a, b) => a.title.localeCompare(b.title));
+        const lists = await getLists();
         setLists(lists);
         setUIState('default');
       } catch (e) {
@@ -500,13 +534,7 @@ function ShortcutForm({
     (async () => {
       if (currentType !== 'hashtag') return;
       try {
-        const iterator = masto.v1.followedTags.list();
-        const tags = [];
-        do {
-          const { value, done } = await iterator.next();
-          if (done || value?.length === 0) break;
-          tags.push(...value);
-        } while (true);
+        const tags = await fetchFollowedTags();
         setFollowedHashtags(tags);
       } catch (e) {
         console.error(e);
@@ -605,6 +633,7 @@ function ShortcutForm({
                         disabled={disabled || uiState === 'loading'}
                         defaultValue={editMode ? shortcut.id : undefined}
                       >
+                        <option value=""></option>
                         {lists.map((list) => (
                           <option value={list.id}>{list.title}</option>
                         ))}
@@ -620,6 +649,7 @@ function ShortcutForm({
                     <span>{text}</span>{' '}
                     <input
                       type={type}
+                      switch={type === 'checkbox' || undefined}
                       name={name}
                       placeholder={placeholder}
                       required={type === 'text' && !notRequired}
@@ -631,7 +661,7 @@ function ShortcutForm({
                       }
                       autocorrect="off"
                       autocapitalize="off"
-                      spellcheck={false}
+                      spellCheck={false}
                       pattern={pattern}
                     />
                     {currentType === 'hashtag' &&
@@ -646,6 +676,12 @@ function ShortcutForm({
                 </p>
               );
             },
+          )}
+          {!!FORM_NOTES[currentType] && (
+            <p class="form-note insignificant">
+              <Icon icon="info" />
+              {FORM_NOTES[currentType]}
+            </p>
           )}
           <footer>
             <button
@@ -675,6 +711,7 @@ function ShortcutForm({
 }
 
 function ImportExport({ shortcuts, onClose }) {
+  const { masto } = api();
   const shortcutsStr = useMemo(() => {
     if (!shortcuts) return '';
     if (!shortcuts.filter(Boolean).length) return '';
@@ -713,6 +750,8 @@ function ImportExport({ shortcuts, onClose }) {
   }, [importShortcutStr]);
   const hasCurrentSettings = states.shortcuts.length > 0;
 
+  const shortcutsImportFieldRef = useRef();
+
   return (
     <div id="import-export-container" class="sheet">
       {!!onClose && (
@@ -731,8 +770,9 @@ function ImportExport({ shortcuts, onClose }) {
             <Icon icon="arrow-down-circle" size="l" class="insignificant" />{' '}
             <span>Import</span>
           </h3>
-          <p>
+          <p class="field-button">
             <input
+              ref={shortcutsImportFieldRef}
               type="text"
               name="import"
               placeholder="Paste shortcuts here"
@@ -741,6 +781,53 @@ function ImportExport({ shortcuts, onClose }) {
                 setImportShortcutStr(e.target.value);
               }}
             />
+            {states.settings.shortcutSettingsCloudImportExport && (
+              <button
+                type="button"
+                class="plain2 small"
+                disabled={importUIState === 'cloud-downloading'}
+                onClick={async () => {
+                  setImportUIState('cloud-downloading');
+                  const currentAccount = getCurrentAccountID();
+                  showToast(
+                    'Downloading saved shortcuts from instance server…',
+                  );
+                  try {
+                    const relationships =
+                      await masto.v1.accounts.relationships.fetch({
+                        id: [currentAccount],
+                      });
+                    const relationship = relationships[0];
+                    if (relationship) {
+                      const { note = '' } = relationship;
+                      if (
+                        /<phanpy-shortcuts-settings>(.*)<\/phanpy-shortcuts-settings>/.test(
+                          note,
+                        )
+                      ) {
+                        const settings = note.match(
+                          /<phanpy-shortcuts-settings>(.*)<\/phanpy-shortcuts-settings>/,
+                        )[1];
+                        const { v, dt, data } = JSON.parse(settings);
+                        shortcutsImportFieldRef.current.value = data;
+                        shortcutsImportFieldRef.current.dispatchEvent(
+                          new Event('input'),
+                        );
+                      }
+                    }
+                    setImportUIState('default');
+                  } catch (e) {
+                    console.error(e);
+                    setImportUIState('error');
+                    showToast('Unable to download shortcuts');
+                  }
+                }}
+                title="Download shortcuts from instance server"
+              >
+                <Icon icon="cloud" />
+                <Icon icon="arrow-down" />
+              </button>
+            )}
           </p>
           {!!parsedImportShortcutStr &&
             Array.isArray(parsedImportShortcutStr) && (
@@ -950,8 +1037,64 @@ function ImportExport({ shortcuts, onClose }) {
                   <Icon icon="share" /> <span>Share</span>
                 </button>
               )}{' '}
+            {states.settings.shortcutSettingsCloudImportExport && (
+              <button
+                type="button"
+                class="plain2"
+                disabled={importUIState === 'cloud-uploading'}
+                onClick={async () => {
+                  setImportUIState('cloud-uploading');
+                  const currentAccount = getCurrentAccountID();
+                  try {
+                    const relationships =
+                      await masto.v1.accounts.relationships.fetch({
+                        id: [currentAccount],
+                      });
+                    const relationship = relationships[0];
+                    if (relationship) {
+                      const { note = '' } = relationship;
+                      // const newNote = `${note}\n\n\n$<phanpy-shortcuts-settings>{shortcutsStr}</phanpy-shortcuts-settings>`;
+                      let newNote = '';
+                      if (
+                        /<phanpy-shortcuts-settings>(.*)<\/phanpy-shortcuts-settings>/.test(
+                          note,
+                        )
+                      ) {
+                        const settingsJSON = JSON.stringify({
+                          v: '1', // version
+                          dt: Date.now(), // datetime stamp
+                          data: shortcutsStr, // shortcuts settings string
+                        });
+                        newNote = note.replace(
+                          /<phanpy-shortcuts-settings>(.*)<\/phanpy-shortcuts-settings>/,
+                          `<phanpy-shortcuts-settings>${settingsJSON}</phanpy-shortcuts-settings>`,
+                        );
+                      } else {
+                        newNote = `${note}\n\n\n<phanpy-shortcuts-settings>${settingsJSON}</phanpy-shortcuts-settings>`;
+                      }
+                      showToast('Saving shortcuts to instance server…');
+                      await masto.v1.accounts
+                        .$select(currentAccount)
+                        .note.create({
+                          comment: newNote,
+                        });
+                      setImportUIState('default');
+                      showToast('Shortcuts saved');
+                    }
+                  } catch (e) {
+                    console.error(e);
+                    setImportUIState('error');
+                    showToast('Unable to save shortcuts');
+                  }
+                }}
+                title="Sync to instance server"
+              >
+                <Icon icon="cloud" />
+                <Icon icon="arrow-up" />
+              </button>
+            )}{' '}
             {shortcutsStr.length > 0 && (
-              <small class="insignificant">
+              <small class="insignificant ib">
                 {shortcutsStr.length} characters
               </small>
             )}
@@ -967,6 +1110,14 @@ function ImportExport({ shortcuts, onClose }) {
             </details>
           )}
         </section>
+        {states.settings.shortcutSettingsCloudImportExport && (
+          <footer>
+            <p>
+              <Icon icon="cloud" /> Import/export settings from/to instance
+              server (Very experimental)
+            </p>
+          </footer>
+        )}
       </main>
     </div>
   );

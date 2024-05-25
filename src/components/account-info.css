@@ -5,6 +5,99 @@
   overflow-y: auto;
   max-width: 100%;
   --banner-overlap: 44px;
+  --posting-stats-size: 8px;
+  --original-color: var(--link-color);
+
+  .note {
+    font-size: 0.95em;
+    line-height: 1.4;
+    text-wrap: pretty;
+    margin-bottom: 16px;
+
+    &:empty {
+      display: none;
+    }
+
+    > *:first-child {
+      margin-top: 0;
+      padding-top: 0;
+    }
+    > *:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    &:not(:has(p)):not(:empty) {
+      /* Some notes don't have <p> tags, so we need to add some padding */
+      padding: 1em 0;
+    }
+  }
+
+  .posting-stats {
+    font-size: 90%;
+    color: var(--text-insignificant-color);
+    background-color: var(--bg-faded-color);
+    padding: 8px 12px;
+
+    &:is(:hover, :focus-within) {
+      background-color: var(--link-bg-hover-color);
+    }
+  }
+
+  .posting-stats-bar {
+    --gap: 0.5px;
+    --gap-color: var(--outline-color);
+    height: var(--posting-stats-size);
+    border-radius: var(--posting-stats-size);
+    overflow: hidden;
+    margin: 8px 0;
+    box-shadow: inset 0 0 0 1px var(--outline-color),
+      inset 0 0 0 1.5px var(--bg-blur-color);
+    background-color: var(--bg-color);
+    background-repeat: no-repeat;
+    animation: swoosh-bg-image 0.3s ease-in-out 0.3s both;
+    background-image: linear-gradient(
+      to right,
+      var(--original-color) 0%,
+      var(--original-color) calc(var(--originals-percentage) - var(--gap)),
+      var(--gap-color) calc(var(--originals-percentage) - var(--gap)),
+      var(--gap-color) calc(var(--originals-percentage) + var(--gap)),
+      var(--reply-to-color) calc(var(--originals-percentage) + var(--gap)),
+      var(--reply-to-color) calc(var(--replies-percentage) - var(--gap)),
+      var(--gap-color) calc(var(--replies-percentage) - var(--gap)),
+      var(--gap-color) calc(var(--replies-percentage) + var(--gap)),
+      var(--reblog-color) calc(var(--replies-percentage) + var(--gap)),
+      var(--reblog-color) 100%
+    );
+  }
+
+  .posting-stats-legends {
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+
+  .posting-stats-legend-item {
+    display: inline-block;
+    width: var(--posting-stats-size);
+    height: var(--posting-stats-size);
+    border-radius: var(--posting-stats-size);
+    background-color: var(--text-insignificant-color);
+    vertical-align: middle;
+    margin: 0 4px 2px;
+    /* border: 1px solid var(--outline-color); */
+    box-shadow: inset 0 0 0 1px var(--outline-color),
+      inset 0 0 0 1.5px var(--bg-blur-color);
+
+    &.posting-stats-legend-item-originals {
+      background-color: var(--original-color);
+    }
+    &.posting-stats-legend-item-replies {
+      background-color: var(--reply-to-color);
+    }
+    &.posting-stats-legend-item-boosts {
+      background-color: var(--reblog-color);
+    }
+  }
 }
 
 .account-container.skeleton {
@@ -177,6 +270,7 @@
 }
 
 .account-container .account-block .account-block-acct {
+  display: block;
   opacity: 0.7;
 }
 
@@ -249,16 +343,6 @@
     margin: 0;
     padding: 0;
   }
-}
-
-.account-container .note {
-  font-size: 95%;
-  line-height: 1.4;
-  text-wrap: pretty;
-}
-.account-container .note:not(:has(p)):not(:empty) {
-  /* Some notes don't have <p> tags, so we need to add some padding */
-  padding: 1em 0;
 }
 
 .account-container .stats {
@@ -412,7 +496,7 @@
   position: relative;
 }
 .timeline-start .account-container header {
-  padding: 16px 16px 1px;
+  padding: 16px;
   animation: none;
 }
 .timeline-start .account-container main {
@@ -520,7 +604,7 @@
   }
 
   main {
-    margin-top: -8px;
+    /* margin-top: -8px; */
     padding-top: 1px;
     padding-bottom: 16px;
   }
@@ -602,77 +686,6 @@
 
   &.loading {
     animation: loading-spin 0.35s linear both infinite !important;
-  }
-}
-
-.account-container {
-  --posting-stats-size: 8px;
-  --original-color: var(--link-color);
-
-  .posting-stats {
-    font-size: 90%;
-    color: var(--text-insignificant-color);
-    background-color: var(--bg-faded-color);
-    padding: 8px 12px;
-
-    &:is(:hover, :focus-within) {
-      background-color: var(--link-bg-hover-color);
-    }
-  }
-
-  .posting-stats-bar {
-    --gap: 0.5px;
-    --gap-color: var(--outline-color);
-    height: var(--posting-stats-size);
-    border-radius: var(--posting-stats-size);
-    overflow: hidden;
-    margin: 8px 0;
-    box-shadow: inset 0 0 0 1px var(--outline-color),
-      inset 0 0 0 1.5px var(--bg-blur-color);
-    background-color: var(--bg-color);
-    background-repeat: no-repeat;
-    animation: swoosh-bg-image 0.3s ease-in-out 0.3s both;
-    background-image: linear-gradient(
-      to right,
-      var(--original-color) 0%,
-      var(--original-color) calc(var(--originals-percentage) - var(--gap)),
-      var(--gap-color) calc(var(--originals-percentage) - var(--gap)),
-      var(--gap-color) calc(var(--originals-percentage) + var(--gap)),
-      var(--reply-to-color) calc(var(--originals-percentage) + var(--gap)),
-      var(--reply-to-color) calc(var(--replies-percentage) - var(--gap)),
-      var(--gap-color) calc(var(--replies-percentage) - var(--gap)),
-      var(--gap-color) calc(var(--replies-percentage) + var(--gap)),
-      var(--reblog-color) calc(var(--replies-percentage) + var(--gap)),
-      var(--reblog-color) 100%
-    );
-  }
-
-  .posting-stats-legends {
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-
-  .posting-stats-legend-item {
-    display: inline-block;
-    width: var(--posting-stats-size);
-    height: var(--posting-stats-size);
-    border-radius: var(--posting-stats-size);
-    background-color: var(--text-insignificant-color);
-    vertical-align: middle;
-    margin: 0 4px 2px;
-    /* border: 1px solid var(--outline-color); */
-    box-shadow: inset 0 0 0 1px var(--outline-color),
-      inset 0 0 0 1.5px var(--bg-blur-color);
-
-    &.posting-stats-legend-item-originals {
-      background-color: var(--original-color);
-    }
-    &.posting-stats-legend-item-replies {
-      background-color: var(--reply-to-color);
-    }
-    &.posting-stats-legend-item-boosts {
-      background-color: var(--reblog-color);
-    }
   }
 }
 
@@ -765,6 +778,111 @@
 
     * {
       vertical-align: middle;
+    }
+  }
+}
+
+#edit-profile-container {
+  p {
+    margin-block: 8px;
+  }
+
+  label {
+    input,
+    textarea {
+      display: block;
+      width: 100%;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 5em;
+      max-height: 50vh;
+    }
+  }
+
+  table {
+    width: 100%;
+
+    th {
+      text-align: left;
+      color: var(--text-insignificant-color);
+      font-weight: normal;
+      font-size: 0.8em;
+      text-transform: uppercase;
+    }
+
+    tbody tr td:first-child {
+      width: 40%;
+    }
+
+    input {
+      width: 100%;
+    }
+  }
+
+  footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+
+    * {
+      vertical-align: middle;
+    }
+  }
+}
+
+.handle-info {
+  .handle-handle {
+    display: inline-block;
+    margin-block: 5px;
+
+    b {
+      font-weight: 600;
+      padding: 2px 4px;
+      border-radius: 4px;
+      display: inline-block;
+      box-shadow: 0 0 0 5px var(--bg-blur-color);
+
+      &.handle-username {
+        color: var(--orange-fg-color);
+        background-color: var(--orange-bg-color);
+      }
+
+      &.handle-server {
+        color: var(--purple-fg-color);
+        background-color: var(--purple-bg-color);
+      }
+    }
+  }
+
+  .handle-at {
+    display: inline-block;
+    margin-inline: -3px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .handle-legend {
+    margin-top: 0.25em;
+  }
+
+  .handle-legend-icon {
+    overflow: hidden;
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 4px solid transparent;
+    border-radius: 8px;
+    background-clip: padding-box;
+
+    &.username {
+      background-color: var(--orange-fg-color);
+      border-color: var(--orange-bg-color);
+    }
+    &.server {
+      background-color: var(--purple-fg-color);
+      border-color: var(--purple-bg-color);
     }
   }
 }

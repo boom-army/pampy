@@ -6,9 +6,9 @@ Boom does not collect or process any personal information from its users. The we
 
 Boom is hosted on [AWS](https://aws.amazon.com/) as a static website. Read more about [AWS's privacy policy](https://aws.amazon.com/privacy/).
 
-## Post translations
+## Translations
 
-Phanpy uses [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) to translate posts.
+Phanpy uses [Lingva API](https://github.com/cheeaun/lingva-api) and [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) as fallbacks for translating post content, profile bio and media description.
 
 ## Error logging
 

@@ -1,14 +1,15 @@
 import './shortcuts.css';
 
-import { Menu, MenuItem } from '@szhsin/react-menu';
+import { MenuDivider } from '@szhsin/react-menu';
 import { memo } from 'preact/compat';
-import { useMemo, useRef } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useNavigate } from 'react-router-dom';
 import { useSnapshot } from 'valtio';
 
 import { SHORTCUTS_META } from '../components/shortcuts-settings';
 import { api } from '../utils/api';
+import { getLists } from '../utils/lists';
 import states from '../utils/states';
 
 import AsyncText from './AsyncText';
@@ -16,6 +17,7 @@ import Icon from './icon';
 import Link from './link';
 import Menu2 from './menu2';
 import MenuLink from './menu-link';
+import SubMenu2 from './submenu2';
 
 function Shortcuts() {
   const { instance } = api();
@@ -34,47 +36,48 @@ function Shortcuts() {
 
   const menuRef = useRef();
 
-  const formattedShortcuts = useMemo(
-    () =>
-      shortcuts
-        .map((pin, i) => {
-          const { type, ...data } = pin;
-          if (!SHORTCUTS_META[type]) return null;
-          let { id, path, title, subtitle, icon } = SHORTCUTS_META[type];
+  const hasLists = useRef(false);
+  const formattedShortcuts = shortcuts
+    .map((pin, i) => {
+      const { type, ...data } = pin;
+      if (!SHORTCUTS_META[type]) return null;
+      let { id, path, title, subtitle, icon } = SHORTCUTS_META[type];
 
-          if (typeof id === 'function') {
-            id = id(data, i);
-          }
-          if (typeof path === 'function') {
-            path = path(
-              {
-                ...data,
-                instance: data.instance || instance,
-              },
-              i,
-            );
-          }
-          if (typeof title === 'function') {
-            title = title(data, i);
-          }
-          if (typeof subtitle === 'function') {
-            subtitle = subtitle(data, i);
-          }
-          if (typeof icon === 'function') {
-            icon = icon(data, i);
-          }
+      if (typeof id === 'function') {
+        id = id(data, i);
+      }
+      if (typeof path === 'function') {
+        path = path(
+          {
+            ...data,
+            instance: data.instance || instance,
+          },
+          i,
+        );
+      }
+      if (typeof title === 'function') {
+        title = title(data, i);
+      }
+      if (typeof subtitle === 'function') {
+        subtitle = subtitle(data, i);
+      }
+      if (typeof icon === 'function') {
+        icon = icon(data, i);
+      }
 
-          return {
-            id,
-            path,
-            title,
-            subtitle,
-            icon,
-          };
-        })
-        .filter(Boolean),
-    [shortcuts],
-  );
+      if (id === 'lists') {
+        hasLists.current = true;
+      }
+
+      return {
+        id,
+        path,
+        title,
+        subtitle,
+        icon,
+      };
+    })
+    .filter(Boolean);
 
   const navigate = useNavigate();
   useHotkeys(['1', '2', '3', '4', '5', '6', '7', '8', '9'], (e, handler) => {
@@ -87,6 +90,8 @@ function Shortcuts() {
       }
     }
   });
+
+  const [lists, setLists] = useState([]);
 
   return (
     <div id="shortcuts">
@@ -147,6 +152,11 @@ function Shortcuts() {
           menuClassName="glass-menu shortcuts-menu"
           gap={8}
           position="anchor"
+          onMenuChange={(e) => {
+            if (e.open && hasLists.current) {
+              getLists().then(setLists);
+            }
+          }}
           menuButton={
             <button
               type="button"
@@ -171,6 +181,35 @@ function Shortcuts() {
           }
         >
           {formattedShortcuts.map(({ id, path, title, subtitle, icon }, i) => {
+            if (id === 'lists') {
+              return (
+                <SubMenu2
+                  menuClassName="glass-menu"
+                  overflow="auto"
+                  gap={-8}
+                  label={
+                    <>
+                      <Icon icon={icon} size="l" />
+                      <span class="menu-grow">
+                        <AsyncText>{title}</AsyncText>
+                      </span>
+                      <Icon icon="chevron-right" />
+                    </>
+                  }
+                >
+                  <MenuLink to="/l">
+                    <span>All Lists</span>
+                  </MenuLink>
+                  <MenuDivider />
+                  {lists?.map((list) => (
+                    <MenuLink key={list.id} to={`/l/${list.id}`}>
+                      <span>{list.title}</span>
+                    </MenuLink>
+                  ))}
+                </SubMenu2>
+              );
+            }
+
             return (
               <MenuLink
                 to={path}

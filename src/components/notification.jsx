@@ -2,11 +2,13 @@ import { Fragment } from 'preact';
 import { memo } from 'preact/compat';
 
 import shortenNumber from '../utils/shorten-number';
-import states from '../utils/states';
+import states, { statusKey } from '../utils/states';
 import store from '../utils/store';
+import { getCurrentAccountID } from '../utils/store-utils';
 import useTruncated from '../utils/useTruncated';
 
 import Avatar from './avatar';
+import CustomEmoji from './custom-emoji';
 import FollowRequestButtons from './follow-request-buttons';
 import Icon from './icon';
 import Link from './link';
@@ -25,6 +27,10 @@ const NOTIFICATION_ICONS = {
   update: 'pencil',
   'admin.signup': 'account-edit',
   'admin.report': 'account-warning',
+  severed_relationships: 'heart-break',
+  moderation_warning: 'alert',
+  emoji_reaction: 'emoji2',
+  'pleroma:emoji_reaction': 'emoji2',
 };
 
 /*
@@ -40,8 +46,28 @@ poll = A poll you have voted in or created has ended
 update = A status you interacted with has been edited
 admin.sign_up = Someone signed up (optionally sent to admins)
 admin.report = A new report has been filed
+severed_relationships = Severed relationships
+moderation_warning = Moderation warning
 */
 
+function emojiText(emoji, emoji_url) {
+  let url;
+  let staticUrl;
+  if (typeof emoji_url === 'string') {
+    url = emoji_url;
+  } else {
+    url = emoji_url?.url;
+    staticUrl = emoji_url?.staticUrl;
+  }
+  return url ? (
+    <>
+      reacted to your post with{' '}
+      <CustomEmoji url={url} staticUrl={staticUrl} alt={emoji} />
+    </>
+  ) : (
+    `reacted to your post with ${emoji}.`
+  );
+}
 const contentText = {
   mention: 'mentioned you in their post.',
   status: 'published a post.',
@@ -63,19 +89,74 @@ const contentText = {
   'favourite+reblog_reply': 'boosted & liked your reply.',
   'admin.sign_up': 'signed up.',
   'admin.report': (targetAccount) => <>reported {targetAccount}</>,
+  severed_relationships: (name) => (
+    <>
+      Lost connections with <i>{name}</i>.
+    </>
+  ),
+  moderation_warning: <b>Moderation warning</b>,
+  emoji_reaction: emojiText,
+  'pleroma:emoji_reaction': emojiText,
+};
+
+// account_suspension, domain_block, user_domain_block
+const SEVERED_RELATIONSHIPS_TEXT = {
+  account_suspension: ({ from, targetName }) => (
+    <>
+      An admin from <i>{from}</i> has suspended <i>{targetName}</i>, which means
+      you can no longer receive updates from them or interact with them.
+    </>
+  ),
+  domain_block: ({ from, targetName, followersCount, followingCount }) => (
+    <>
+      An admin from <i>{from}</i> has blocked <i>{targetName}</i>. Affected
+      followers: {followersCount}, followings: {followingCount}.
+    </>
+  ),
+  user_domain_block: ({ targetName, followersCount, followingCount }) => (
+    <>
+      You have blocked <i>{targetName}</i>. Removed followers: {followersCount},
+      followings: {followingCount}.
+    </>
+  ),
+};
+
+const MODERATION_WARNING_TEXT = {
+  none: 'Your account has received a moderation warning.',
+  disable: 'Your account has been disabled.',
+  mark_statuses_as_sensitive:
+    'Some of your posts have been marked as sensitive.',
+  delete_statuses: 'Some of your posts have been deleted.',
+  sensitive: 'Your posts will be marked as sensitive from now on.',
+  silence: 'Your account has been limited.',
+  suspend: 'Your account has been suspended.',
 };
 
 const AVATARS_LIMIT = 50;
 
-function Notification({ notification, instance, isStatic }) {
-  const { id, status, account, report, _accounts, _statuses } = notification;
+function Notification({
+  notification,
+  instance,
+  isStatic,
+  disableContextMenu,
+}) {
+  const {
+    id,
+    status,
+    account,
+    report,
+    event,
+    moderation_warning,
+    _accounts,
+    _statuses,
+  } = notification;
   let { type } = notification;
 
   // status = Attached when type of the notification is favourite, reblog, status, mention, poll, or update
   const actualStatus = status?.reblog || status;
   const actualStatusID = actualStatus?.id;
 
-  const currentAccount = store.session.get('currentAccount');
+  const currentAccount = getCurrentAccountID();
   const isSelf = currentAccount === account?.id;
   const isVoted = status?.poll?.voted;
   const isReplyToOthers =
@@ -123,13 +204,30 @@ function Notification({ notification, instance, isStatic }) {
 
   if (typeof text === 'function') {
     const count = _statuses?.length || _accounts?.length;
-    if (count) {
-      text = text(count);
-    } else if (type === 'admin.report') {
+    if (type === 'admin.report') {
       const targetAccount = report?.targetAccount;
       if (targetAccount) {
         text = text(<NameText account={targetAccount} showAvatar />);
       }
+    } else if (type === 'severed_relationships') {
+      const targetName = event?.targetName;
+      if (targetName) {
+        text = text(targetName);
+      }
+    } else if (
+      (type === 'emoji_reaction' || type === 'pleroma:emoji_reaction') &&
+      notification.emoji
+    ) {
+      const emojiURL =
+        notification.emoji_url || // This is string
+        status?.emojis?.find?.(
+          (emoji) =>
+            emoji?.shortcode ===
+            notification.emoji.replace(/^:/, '').replace(/:$/, ''),
+        ); // Emoji object instead of string
+      text = text(notification.emoji, emojiURL);
+    } else if (count) {
+      text = text(count);
     }
   }
 
@@ -153,6 +251,8 @@ function Notification({ notification, instance, isStatic }) {
       heading: genericAccountsHeading,
       accounts: _accounts,
       showReactions: type === 'favourite+reblog',
+      excludeRelationshipAttrs: type === 'follow' ? ['followedBy'] : [],
+      postID: statusKey(actualStatusID, instance),
     };
   };
 
@@ -197,9 +297,11 @@ function Notification({ notification, instance, isStatic }) {
                       </b>{' '}
                     </>
                   ) : (
-                    <>
-                      <NameText account={account} showAvatar />{' '}
-                    </>
+                    account && (
+                      <>
+                        <NameText account={account} showAvatar />{' '}
+                      </>
+                    )
                   )}
                 </>
               )}
@@ -217,6 +319,37 @@ function Notification({ notification, instance, isStatic }) {
             </p>
             {type === 'follow_request' && (
               <FollowRequestButtons accountID={account.id} />
+            )}
+            {type === 'severed_relationships' && (
+              <div>
+                {SEVERED_RELATIONSHIPS_TEXT[event.type]({
+                  from: instance,
+                  ...event,
+                })}
+                <br />
+                <a
+                  href={`https://${instance}/severed_relationships`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Learn more <Icon icon="external" size="s" />
+                </a>
+                .
+              </div>
+            )}
+            {type === 'moderation_warning' && !!moderation_warning && (
+              <div>
+                {MODERATION_WARNING_TEXT[moderation_warning.action]}
+                <br />
+                <a
+                  href={`/disputes/strikes/${moderation_warning.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Learn more <Icon icon="external" size="s" />
+                </a>
+                .
+              </div>
             )}
           </>
         )}
@@ -286,7 +419,12 @@ function Notification({ notification, instance, isStatic }) {
                     instance ? `/${instance}/s/${status.id}` : `/s/${status.id}`
                   }
                 >
-                  <Status status={status} size="s" />
+                  <Status
+                    status={status}
+                    size="s"
+                    previewMode
+                    allowContextMenu
+                  />
                 </TruncatedLink>
               </li>
             ))}
@@ -300,25 +438,39 @@ function Notification({ notification, instance, isStatic }) {
                 ? `/${instance}/s/${actualStatusID}`
                 : `/s/${actualStatusID}`
             }
-            onContextMenu={(e) => {
-              const post = e.target.querySelector('.status');
-              if (post) {
-                // Fire a custom event to open the context menu
-                if (e.metaKey) return;
-                e.preventDefault();
-                post.dispatchEvent(
-                  new MouseEvent('contextmenu', {
-                    clientX: e.clientX,
-                    clientY: e.clientY,
-                  }),
-                );
-              }
-            }}
+            onContextMenu={
+              !disableContextMenu
+                ? (e) => {
+                    const post = e.target.querySelector('.status');
+                    if (post) {
+                      // Fire a custom event to open the context menu
+                      if (e.metaKey) return;
+                      e.preventDefault();
+                      post.dispatchEvent(
+                        new MouseEvent('contextmenu', {
+                          clientX: e.clientX,
+                          clientY: e.clientY,
+                        }),
+                      );
+                    }
+                  }
+                : undefined
+            }
           >
             {isStatic ? (
-              <Status status={actualStatus} size="s" />
+              <Status
+                status={actualStatus}
+                size="s"
+                readOnly
+                allowContextMenu
+              />
             ) : (
-              <Status statusID={actualStatusID} size="s" />
+              <Status
+                statusID={actualStatusID}
+                size="s"
+                readOnly
+                allowContextMenu
+              />
             )}
           </TruncatedLink>
         )}
@@ -332,4 +484,6 @@ function TruncatedLink(props) {
   return <Link {...props} data-read-more="Read more →" ref={ref} />;
 }
 
-export default memo(Notification);
+export default memo(Notification, (oldProps, newProps) => {
+  return oldProps.notification?.id === newProps.notification?.id;
+});

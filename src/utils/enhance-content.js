@@ -10,22 +10,20 @@ function _enhanceContent(content, opts = {}) {
   const dom = document.createElement('div');
   dom.innerHTML = enhancedContent;
   const hasLink = /<a/i.test(enhancedContent);
-  const hasCodeBlock = enhancedContent.indexOf('```') !== -1;
+  const hasCodeBlock = enhancedContent.includes('```');
 
   if (hasLink) {
     // Add target="_blank" to all links with no target="_blank"
     // E.g. `note` in `account`
-    const noTargetBlankLinks = Array.from(
-      dom.querySelectorAll('a:not([target="_blank"])'),
-    );
+    const noTargetBlankLinks = dom.querySelectorAll('a:not([target="_blank"])');
     noTargetBlankLinks.forEach((link) => {
       link.setAttribute('target', '_blank');
     });
 
     // Remove all classes except `u-url`, `mention`, `hashtag`
-    const links = Array.from(dom.querySelectorAll('a[class]'));
+    const links = dom.querySelectorAll('a[class]');
     links.forEach((link) => {
-      Array.from(link.classList).forEach((c) => {
+      link.classList.forEach((c) => {
         if (!whitelistLinkClasses.includes(c)) {
           link.classList.remove(c);
         }
@@ -35,17 +33,18 @@ function _enhanceContent(content, opts = {}) {
 
   // Add 'has-url-text' to all links that contains a url
   if (hasLink) {
-    const links = Array.from(dom.querySelectorAll('a[href]'));
+    const links = dom.querySelectorAll('a[href]');
     links.forEach((link) => {
       if (/^https?:\/\//i.test(link.textContent.trim())) {
         link.classList.add('has-url-text');
+        shortenLink(link);
       }
     });
   }
 
   // Spanify un-spanned mentions
   if (hasLink) {
-    const links = Array.from(dom.querySelectorAll('a[href]'));
+    const links = dom.querySelectorAll('a[href]');
     const usernames = [];
     links.forEach((link) => {
       const text = link.innerText.trim();
@@ -56,8 +55,8 @@ function _enhanceContent(content, opts = {}) {
         const [_, username, domain] = text.split('@');
         if (!hasChildren) {
           if (
-            !usernames.find(([u]) => u === username) ||
-            usernames.find(([u, d]) => u === username && d === domain)
+            !usernames.some(([u]) => u === username) ||
+            usernames.some(([u, d]) => u === username && d === domain)
           ) {
             link.innerHTML = `@<span>${username}</span>`;
             usernames.push([username, domain]);
@@ -79,7 +78,7 @@ function _enhanceContent(content, opts = {}) {
   // ======
   // Convert :shortcode: to <img />
   let textNodes;
-  if (enhancedContent.indexOf(':') !== -1) {
+  if (enhancedContent.includes(':')) {
     textNodes = extractTextNodes(dom);
     textNodes.forEach((node) => {
       let html = node.nodeValue
@@ -90,8 +89,8 @@ function _enhanceContent(content, opts = {}) {
         html = emojifyText(html, emojis);
       }
       fauxDiv.innerHTML = html;
-      const nodes = Array.from(fauxDiv.childNodes);
-      node.replaceWith(...nodes);
+      // const nodes = [...fauxDiv.childNodes];
+      node.replaceWith(...fauxDiv.childNodes);
     });
   }
 
@@ -99,7 +98,7 @@ function _enhanceContent(content, opts = {}) {
   // ===========
   // Convert ```code``` to <pre><code>code</code></pre>
   if (hasCodeBlock) {
-    const blocks = Array.from(dom.querySelectorAll('p')).filter((p) =>
+    const blocks = [...dom.querySelectorAll('p')].filter((p) =>
       /^```[^]+```$/g.test(p.innerText.trim()),
     );
     blocks.forEach((block) => {
@@ -113,7 +112,7 @@ function _enhanceContent(content, opts = {}) {
 
   // Convert multi-paragraph code blocks to <pre><code>code</code></pre>
   if (hasCodeBlock) {
-    const paragraphs = Array.from(dom.querySelectorAll('p'));
+    const paragraphs = [...dom.querySelectorAll('p')];
     // Filter out paragraphs with ``` in beginning only
     const codeBlocks = paragraphs.filter((p) => /^```/g.test(p.innerText));
     // For each codeBlocks, get all paragraphs until the last paragraph with ``` at the end only
@@ -153,7 +152,7 @@ function _enhanceContent(content, opts = {}) {
   // INLINE CODE
   // ===========
   // Convert `code` to <code>code</code>
-  if (enhancedContent.indexOf('`') !== -1) {
+  if (enhancedContent.includes('`')) {
     textNodes = extractTextNodes(dom);
     textNodes.forEach((node) => {
       let html = node.nodeValue
@@ -164,8 +163,8 @@ function _enhanceContent(content, opts = {}) {
         html = html.replaceAll(/(`[^]+?`)/g, '<code>$1</code>');
       }
       fauxDiv.innerHTML = html;
-      const nodes = Array.from(fauxDiv.childNodes);
-      node.replaceWith(...nodes);
+      // const nodes = [...fauxDiv.childNodes];
+      node.replaceWith(...fauxDiv.childNodes);
     });
   }
 
@@ -188,53 +187,53 @@ function _enhanceContent(content, opts = {}) {
         );
       }
       fauxDiv.innerHTML = html;
-      const nodes = Array.from(fauxDiv.childNodes);
-      node.replaceWith(...nodes);
+      // const nodes = [...fauxDiv.childNodes];
+      node.replaceWith(...fauxDiv.childNodes);
     });
   }
 
   // HASHTAG STUFFING
   // ================
   // Get the <p> that contains a lot of hashtags, add a class to it
-  if (enhancedContent.indexOf('#') !== -1) {
+  if (enhancedContent.includes('#')) {
     let prevIndex = null;
-    const hashtagStuffedParagraphs = Array.from(
-      dom.querySelectorAll('p'),
-    ).filter((p, index) => {
-      let hashtagCount = 0;
-      for (let i = 0; i < p.childNodes.length; i++) {
-        const node = p.childNodes[i];
+    const hashtagStuffedParagraphs = [...dom.querySelectorAll('p')].filter(
+      (p, index) => {
+        let hashtagCount = 0;
+        for (let i = 0; i < p.childNodes.length; i++) {
+          const node = p.childNodes[i];
 
-        if (node.nodeType === Node.TEXT_NODE) {
-          const text = node.textContent.trim();
-          if (text !== '') {
-            return false;
-          }
-        } else if (node.tagName === 'BR') {
-          // Ignore <br />
-        } else if (node.tagName === 'A') {
-          const linkText = node.textContent.trim();
-          if (!linkText || !linkText.startsWith('#')) {
-            return false;
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim();
+            if (text !== '') {
+              return false;
+            }
+          } else if (node.tagName === 'BR') {
+            // Ignore <br />
+          } else if (node.tagName === 'A') {
+            const linkText = node.textContent.trim();
+            if (!linkText || !linkText.startsWith('#')) {
+              return false;
+            } else {
+              hashtagCount++;
+            }
           } else {
-            hashtagCount++;
+            return false;
           }
-        } else {
-          return false;
         }
-      }
-      // Only consider "stuffing" if:
-      // - there are more than 3 hashtags
-      // - there are more than 1 hashtag in adjacent paragraphs
-      if (hashtagCount > 3) {
-        prevIndex = index;
-        return true;
-      }
-      if (hashtagCount > 1 && prevIndex && index === prevIndex + 1) {
-        prevIndex = index;
-        return true;
-      }
-    });
+        // Only consider "stuffing" if:
+        // - there are more than 3 hashtags
+        // - there are more than 1 hashtag in adjacent paragraphs
+        if (hashtagCount > 3) {
+          prevIndex = index;
+          return true;
+        }
+        if (hashtagCount > 1 && prevIndex && index === prevIndex + 1) {
+          prevIndex = index;
+          return true;
+        }
+      },
+    );
     if (hashtagStuffedParagraphs?.length) {
       hashtagStuffedParagraphs.forEach((p) => {
         p.classList.add('hashtag-stuffing');
@@ -243,8 +242,20 @@ function _enhanceContent(content, opts = {}) {
     }
   }
 
+  // ADD ASPECT RATIO TO ALL IMAGES
+  if (enhancedContent.includes('<img')) {
+    dom.querySelectorAll('img').forEach((img) => {
+      const width = img.getAttribute('width') || img.naturalWidth;
+      const height = img.getAttribute('height') || img.naturalHeight;
+      if (width && height) {
+        img.style.setProperty('--original-aspect-ratio', `${width}/${height}`);
+      }
+    });
+  }
+
   if (postEnhanceDOM) {
-    postEnhanceDOM(dom); // mutate dom
+    queueMicrotask(() => postEnhanceDOM(dom));
+    // postEnhanceDOM(dom); // mutate dom
   }
 
   enhancedContent = dom.innerHTML;
@@ -288,20 +299,46 @@ const defaultRejectFilter = [
 const defaultRejectFilterMap = Object.fromEntries(
   defaultRejectFilter.map((nodeName) => [nodeName, true]),
 );
+
+const URL_PREFIX_REGEX = /^(https?:\/\/(www\.)?|xmpp:)/;
+const URL_DISPLAY_LENGTH = 30;
+// Similar to https://github.com/mastodon/mastodon/blob/1666b1955992e16f4605b414c6563ca25b3a3f18/app/lib/text_formatter.rb#L54-L69
+function shortenLink(link) {
+  if (!link || link.querySelector?.('*')) {
+    return;
+  }
+  try {
+    const url = link.innerText.trim();
+    const prefix = (url.match(URL_PREFIX_REGEX) || [])[0] || '';
+    if (!prefix) return;
+    const displayURL = url.slice(
+      prefix.length,
+      prefix.length + URL_DISPLAY_LENGTH,
+    );
+    const suffix = url.slice(prefix.length + URL_DISPLAY_LENGTH);
+    const cutoff = url.slice(prefix.length).length > URL_DISPLAY_LENGTH;
+    link.innerHTML = `<span class="invisible">${prefix}</span><span class=${
+      cutoff ? 'ellipsis' : ''
+    }>${displayURL}</span><span class="invisible">${suffix}</span>`;
+  } catch (e) {}
+}
+
 function extractTextNodes(dom, opts = {}) {
   const textNodes = [];
+  const rejectFilterMap = Object.assign(
+    {},
+    defaultRejectFilterMap,
+    opts.rejectFilter?.reduce((acc, cur) => {
+      acc[cur] = true;
+      return acc;
+    }, {}),
+  );
   const walk = document.createTreeWalker(
     dom,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode(node) {
-        if (defaultRejectFilterMap[node.parentNode.nodeName]) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        if (
-          opts.rejectFilter &&
-          opts.rejectFilter.includes(node.parentNode.nodeName)
-        ) {
+        if (rejectFilterMap[node.parentNode.nodeName]) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;

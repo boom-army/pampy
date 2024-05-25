@@ -9,12 +9,12 @@ import {
 } from 'preact/hooks';
 import QuickPinchZoom, { make3dTransformValue } from 'react-quick-pinch-zoom';
 
+import formatDuration from '../utils/format-duration';
 import mem from '../utils/mem';
 import states from '../utils/states';
 
 import Icon from './icon';
 import Link from './link';
-import { formatDuration } from './status';
 
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent); // https://stackoverflow.com/a/23522755
 
@@ -54,6 +54,7 @@ const AltBadge = (props) => {
 };
 
 const MEDIA_CAPTION_LIMIT = 140;
+const MEDIA_CAPTION_LIMIT_LONGER = 280;
 export const isMediaCaptionLong = mem((caption) =>
   caption?.length
     ? caption.length > MEDIA_CAPTION_LIMIT ||
@@ -69,10 +70,11 @@ function Media({
   showOriginal,
   autoAnimate,
   showCaption,
+  allowLongerCaption,
   altIndex,
   onClick = () => {},
 }) {
-  const {
+  let {
     blurhash,
     description,
     meta,
@@ -82,21 +84,33 @@ function Media({
     url,
     type,
   } = media;
+  if (/no\-preview\./i.test(previewUrl)) {
+    previewUrl = null;
+  }
   const { original = {}, small, focus } = meta || {};
 
-  const width = showOriginal ? original?.width : small?.width;
-  const height = showOriginal ? original?.height : small?.height;
+  const width = showOriginal
+    ? original?.width
+    : small?.width || original?.width;
+  const height = showOriginal
+    ? original?.height
+    : small?.height || original?.height;
   const mediaURL = showOriginal ? url : previewUrl || url;
   const remoteMediaURL = showOriginal
     ? remoteUrl
     : previewRemoteUrl || remoteUrl;
-  const orientation = width >= height ? 'landscape' : 'portrait';
+  const hasDimensions = width && height;
+  const orientation = hasDimensions
+    ? width > height
+      ? 'landscape'
+      : 'portrait'
+    : null;
 
   const rgbAverageColor = blurhash ? getBlurHashAverageColor(blurhash) : null;
 
   const videoRef = useRef();
 
-  let focalBackgroundPosition;
+  let focalPosition;
   if (focus) {
     // Convert focal point to CSS background position
     // Formula from jquery-focuspoint
@@ -105,7 +119,7 @@ function Media({
     // x = 1, y = -1 => 100% 100%
     const x = ((focus.x + 1) / 2) * 100;
     const y = ((1 - focus.y) / 2) * 100;
-    focalBackgroundPosition = `${x.toFixed(0)}% ${y.toFixed(0)}%`;
+    focalPosition = `${x.toFixed(0)}% ${y.toFixed(0)}%`;
   }
 
   const mediaRef = useRef();
@@ -131,7 +145,8 @@ function Media({
     enabled: pinchZoomEnabled,
     draggableUnZoomed: false,
     inertiaFriction: 0.9,
-    doubleTapZoomOutOnMaxScale: true,
+    tapZoomFactor: 2,
+    doubleTapToggleZoom: true,
     containerProps: {
       className: 'media-zoom',
       style: {
@@ -151,11 +166,18 @@ function Media({
     [to],
   );
 
+  const remoteMediaURLObj = remoteMediaURL ? getURLObj(remoteMediaURL) : null;
   const isVideoMaybe =
     type === 'unknown' &&
-    /\.(mp4|m4a|m4p|m4b|m4r|m4v|mov|webm)$/i.test(remoteMediaURL);
+    remoteMediaURLObj &&
+    /\.(mp4|m4r|m4v|mov|webm)$/i.test(remoteMediaURLObj.pathname);
+  const isAudioMaybe =
+    type === 'unknown' &&
+    remoteMediaURLObj &&
+    /\.(mp3|ogg|wav|m4a|m4p|m4b)$/i.test(remoteMediaURLObj.pathname);
   const isImage =
-    type === 'image' || (type === 'unknown' && previewUrl && !isVideoMaybe);
+    type === 'image' ||
+    (type === 'unknown' && previewUrl && !isVideoMaybe && !isAudioMaybe);
 
   const parentRef = useRef();
   const [imageSmallerThanParent, setImageSmallerThanParent] = useState(false);
@@ -191,8 +213,15 @@ function Media({
         };
 
   const longDesc = isMediaCaptionLong(description);
-  const showInlineDesc =
+  let showInlineDesc =
     !!showCaption && !showOriginal && !!description && !longDesc;
+  if (
+    allowLongerCaption &&
+    !showInlineDesc &&
+    description?.length <= MEDIA_CAPTION_LIMIT_LONGER
+  ) {
+    showInlineDesc = true;
+  }
   const Figure = !showInlineDesc
     ? Fragment
     : (props) => {
@@ -274,7 +303,11 @@ function Media({
                 }}
                 onError={(e) => {
                   const { src } = e.target;
-                  if (src === mediaURL) {
+                  if (
+                    src === mediaURL &&
+                    remoteMediaURL &&
+                    mediaURL !== remoteMediaURL
+                  ) {
                     e.target.src = remoteMediaURL;
                   }
                 }}
@@ -290,10 +323,11 @@ function Media({
                 data-orientation={orientation}
                 loading="lazy"
                 style={{
-                  backgroundColor:
-                    rgbAverageColor && `rgb(${rgbAverageColor.join(',')})`,
-                  backgroundPosition: focalBackgroundPosition || 'center',
+                  // backgroundColor:
+                  //   rgbAverageColor && `rgb(${rgbAverageColor.join(',')})`,
+                  // backgroundPosition: focalBackgroundPosition || 'center',
                   // Duration based on width or height in pixels
+                  objectPosition: focalPosition || 'center',
                   // 100px per second (rough estimate)
                   // Clamp between 5s and 120s
                   '--anim-duration': `${Math.min(
@@ -302,12 +336,26 @@ function Media({
                   )}s`,
                 }}
                 onLoad={(e) => {
-                  e.target.closest('.media-image').style.backgroundImage = '';
+                  // e.target.closest('.media-image').style.backgroundImage = '';
                   e.target.dataset.loaded = true;
+                  if (!hasDimensions) {
+                    const $media = e.target.closest('.media');
+                    if ($media) {
+                      const { naturalWidth, naturalHeight } = e.target;
+                      $media.dataset.orientation =
+                        naturalWidth > naturalHeight ? 'landscape' : 'portrait';
+                      $media.style.setProperty('--width', `${naturalWidth}px`);
+                      $media.style.setProperty(
+                        '--height',
+                        `${naturalHeight}px`,
+                      );
+                      $media.style.aspectRatio = `${naturalWidth}/${naturalHeight}`;
+                    }
+                  }
                 }}
                 onError={(e) => {
                   const { src } = e.target;
-                  if (src === mediaURL) {
+                  if (src === mediaURL && mediaURL !== remoteMediaURL) {
                     e.target.src = remoteMediaURL;
                   }
                 }}
@@ -321,6 +369,7 @@ function Media({
       </Figure>
     );
   } else if (type === 'gifv' || type === 'video' || isVideoMaybe) {
+    const hasDuration = original.duration > 0;
     const shortDuration = original.duration < 31;
     const isGIF = type === 'gifv' && shortDuration;
     // If GIF is too long, treat it as a video
@@ -339,7 +388,7 @@ function Media({
       data-orientation="${orientation}"
       preload="auto"
       autoplay
-      muted="${isGIF}"
+      ${isGIF ? 'muted' : ''}
       ${isGIF ? '' : 'controls'}
       playsinline
       loop="${loopable}"
@@ -357,7 +406,7 @@ function Media({
         <Parent
           class={`media ${className} media-${isGIF ? 'gif' : 'video'} ${
             autoGIFAnimate ? 'media-contain' : ''
-          }`}
+          } ${hoverAnimate ? 'media-hover-animate' : ''}`}
           data-orientation={orientation}
           data-formatted-duration={
             !showOriginal ? formattedDuration : undefined
@@ -456,14 +505,61 @@ function Media({
             />
           ) : (
             <>
-              <img
-                src={previewUrl}
-                alt={showInlineDesc ? '' : description}
-                width={width}
-                height={height}
-                data-orientation={orientation}
-                loading="lazy"
-              />
+              {previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt={showInlineDesc ? '' : description}
+                  width={width}
+                  height={height}
+                  data-orientation={orientation}
+                  loading="lazy"
+                  decoding="async"
+                  onLoad={(e) => {
+                    if (!hasDimensions) {
+                      const $media = e.target.closest('.media');
+                      if ($media) {
+                        const { naturalHeight, naturalWidth } = e.target;
+                        $media.dataset.orientation =
+                          naturalWidth > naturalHeight
+                            ? 'landscape'
+                            : 'portrait';
+                        $media.style.setProperty(
+                          '--width',
+                          `${naturalWidth}px`,
+                        );
+                        $media.style.setProperty(
+                          '--height',
+                          `${naturalHeight}px`,
+                        );
+                        $media.style.aspectRatio = `${naturalWidth}/${naturalHeight}`;
+                      }
+                    }
+                  }}
+                />
+              ) : (
+                <video
+                  src={url + '#t=0.1'} // Make Safari show 1st-frame preview
+                  width={width}
+                  height={height}
+                  data-orientation={orientation}
+                  preload="metadata"
+                  muted
+                  disablePictureInPicture
+                  onLoadedMetadata={(e) => {
+                    if (!hasDuration) {
+                      const { duration } = e.target;
+                      if (duration) {
+                        const formattedDuration = formatDuration(duration);
+                        const container = e.target.closest('.media-video');
+                        if (container) {
+                          container.dataset.formattedDuration =
+                            formattedDuration;
+                        }
+                      }
+                    }
+                  }}
+                />
+              )}
               <div class="media-play">
                 <Icon icon="play" size="xl" />
               </div>
@@ -475,7 +571,7 @@ function Media({
         </Parent>
       </Figure>
     );
-  } else if (type === 'audio') {
+  } else if (type === 'audio' || isAudioMaybe) {
     const formattedDuration = formatDuration(original.duration);
     return (
       <Figure>
@@ -498,6 +594,12 @@ function Media({
               height={height}
               data-orientation={orientation}
               loading="lazy"
+              onError={(e) => {
+                try {
+                  // Remove self if broken
+                  e.target?.remove?.();
+                } catch (e) {}
+              }}
             />
           ) : null}
           {!showOriginal && (
@@ -513,6 +615,15 @@ function Media({
         </Parent>
       </Figure>
     );
+  }
+}
+
+function getURLObj(url) {
+  try {
+    // Fake base URL if url doesn't have https:// prefix
+    return new URL(url, location.origin);
+  } catch (e) {
+    return null;
   }
 }
 

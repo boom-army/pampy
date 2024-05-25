@@ -9,6 +9,7 @@ import List from '../pages/list';
 import Mentions from '../pages/mentions';
 import Notifications from '../pages/notifications';
 import Public from '../pages/public';
+import Search from '../pages/search';
 import Trending from '../pages/trending';
 import states from '../utils/states';
 import useTitle from '../utils/useTitle';
@@ -33,8 +34,13 @@ function Columns() {
       hashtag: Hashtag,
       mentions: Mentions,
       trending: Trending,
+      search: Search,
     }[type];
     if (!Component) return null;
+    // Don't show Search column with no query, for now
+    if (type === 'search' && !params.query) return null;
+    // Don't show List column with no list, for now
+    if (type === 'list' && !params.id) return null;
     return (
       <Component key={type + JSON.stringify(params)} {...params} columnMode />
     );

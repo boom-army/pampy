@@ -1,3 +1,7 @@
+import { memo } from 'preact/compat';
+
+import CustomEmoji from './custom-emoji';
+
 function EmojiText({ text, emojis }) {
   if (!text) return '';
   if (!emojis?.length) return text;
@@ -10,25 +14,16 @@ function EmojiText({ text, emojis }) {
     const emoji = emojis.find((e) => e.shortcode === word);
     if (emoji) {
       const { url, staticUrl } = emoji;
-      return (
-        <picture>
-          <source srcset={staticUrl} media="(prefers-reduced-motion: reduce)" />
-          <img
-            key={word}
-            src={url}
-            alt={word}
-            class="shortcode-emoji emoji"
-            width="16"
-            height="16"
-            loading="lazy"
-            decoding="async"
-          />
-        </picture>
-      );
+      return <CustomEmoji staticUrl={staticUrl} alt={word} url={url} />;
     }
     return word;
   });
   return elements;
 }
 
-export default EmojiText;
+export default memo(
+  EmojiText,
+  (oldProps, newProps) =>
+    oldProps.text === newProps.text &&
+    oldProps.emojis?.length === newProps.emojis?.length,
+);

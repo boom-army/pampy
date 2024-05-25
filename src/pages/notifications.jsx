@@ -3,6 +3,7 @@ import './notifications.css';
 import { Fragment } from 'preact';
 import { memo } from 'preact/compat';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { InView } from 'react-intersection-observer';
 import { useSearchParams } from 'react-router-dom';
 import { useSnapshot } from 'valtio';
@@ -13,8 +14,10 @@ import FollowRequestButtons from '../components/follow-request-buttons';
 import Icon from '../components/icon';
 import Link from '../components/link';
 import Loader from '../components/loader';
+import Modal from '../components/modal';
 import NavMenu from '../components/nav-menu';
 import Notification from '../components/notification';
+import Status from '../components/status';
 import { api } from '../utils/api';
 import enhanceContent from '../utils/enhance-content';
 import groupNotifications from '../utils/group-notifications';
@@ -22,14 +25,22 @@ import handleContentLinks from '../utils/handle-content-links';
 import niceDateTime from '../utils/nice-date-time';
 import { getRegistration } from '../utils/push-notifications';
 import shortenNumber from '../utils/shorten-number';
+import showToast from '../utils/show-toast';
 import states, { saveStatus } from '../utils/states';
 import { getCurrentInstance } from '../utils/store-utils';
+import supports from '../utils/supports';
 import usePageVisibility from '../utils/usePageVisibility';
 import useScroll from '../utils/useScroll';
 import useTitle from '../utils/useTitle';
 
-const LIMIT = 30; // 30 is the maximum limit :(
+const LIMIT = 80;
 const emptySearchParams = new URLSearchParams();
+
+const scrollIntoViewOptions = {
+  block: 'center',
+  inline: 'center',
+  behavior: 'smooth',
+};
 
 function Notifications({ columnMode }) {
   useTitle('Notifications', '/notifications');
@@ -61,6 +72,13 @@ function Notifications({ columnMode }) {
         excludeTypes: ['follow_request'],
       });
     }
+    if (/max_id=($|&)/i.test(notificationsIterator.current?.nextParams)) {
+      // Pixelfed returns next paginationed link with empty max_id
+      // I assume, it's done (end of list)
+      return {
+        done: true,
+      };
+    }
     const allNotifications = await notificationsIterator.current.next();
     const notifications = allNotifications.value;
 
@@ -70,6 +88,32 @@ function Notifications({ columnMode }) {
           skipThreading: true,
         });
       });
+
+      // TEST: Slot in a fake notification to test 'severed_relationships'
+      // notifications.unshift({
+      //   id: '123123',
+      //   type: 'severed_relationships',
+      //   createdAt: '2024-03-22T19:20:08.316Z',
+      //   event: {
+      //     type: 'account_suspension',
+      //     targetName: 'mastodon.dev',
+      //     followersCount: 0,
+      //     followingCount: 0,
+      //   },
+      // });
+
+      // TEST: Slot in a fake notification to test 'moderation_warning'
+      // notifications.unshift({
+      //   id: '123123',
+      //   type: 'moderation_warning',
+      //   createdAt: new Date().toISOString(),
+      //   moderation_warning: {
+      //     id: '1231234',
+      //     action: 'mark_statuses_as_sensitive',
+      //   },
+      // });
+
+      // console.log({ notifications });
 
       const groupedNotifications = groupNotifications(notifications);
 
@@ -129,6 +173,28 @@ function Notifications({ columnMode }) {
     }
   }
 
+  const supportsFilteredNotifications = supports(
+    '@mastodon/filtered-notifications',
+  );
+  const [showNotificationsSettings, setShowNotificationsSettings] =
+    useState(false);
+  const [notificationsPolicy, setNotificationsPolicy] = useState({});
+  function fetchNotificationsPolicy() {
+    return masto.v1.notifications.policy.fetch().catch(() => {});
+  }
+  function loadNotificationsPolicy() {
+    fetchNotificationsPolicy()
+      .then((policy) => {
+        console.log('✨ Notifications policy', policy);
+        setNotificationsPolicy(policy);
+      })
+      .catch(() => {});
+  }
+  const [notificationsRequests, setNotificationsRequests] = useState(null);
+  function fetchNotificationsRequest() {
+    return masto.v1.notifications.requests.list();
+  }
+
   const loadNotifications = (firstLoad) => {
     setShowNew(false);
     setUIState('loading');
@@ -154,6 +220,10 @@ function Notifications({ columnMode }) {
               setFollowRequests(requests);
             })
             .catch(() => {});
+
+          if (supportsFilteredNotifications) {
+            loadNotificationsPolicy();
+          }
         }
 
         const { done } = await fetchNotificationsPromise;
@@ -161,6 +231,7 @@ function Notifications({ columnMode }) {
 
         setUIState('default');
       } catch (e) {
+        console.error(e);
         setUIState('error');
       }
     })();
@@ -209,7 +280,6 @@ function Notifications({ columnMode }) {
 
   const lastHiddenTime = useRef();
   usePageVisibility((visible) => {
-    let unsub;
     if (visible) {
       const timeDiff = Date.now() - lastHiddenTime.current;
       if (!lastHiddenTime.current || timeDiff > 1000 * 3) {
@@ -220,17 +290,16 @@ function Notifications({ columnMode }) {
       } else {
         lastHiddenTime.current = Date.now();
       }
-      unsub = subscribeKey(states, 'notificationsShowNew', (v) => {
-        if (v) {
-          loadUpdates();
-        }
-        setShowNew(v);
-      });
     }
-    return () => {
-      unsub?.();
-    };
   });
+  useEffect(() => {
+    let unsub = subscribeKey(states, 'notificationsShowNew', (v) => {
+      if (uiState === 'loading') return;
+      if (v) loadUpdates();
+      setShowNew(v);
+    });
+    return () => unsub?.();
+  }, []);
 
   const todayDate = new Date();
   const yesterdayDate = new Date(todayDate - 24 * 60 * 60 * 1000);
@@ -270,11 +339,84 @@ function Notifications({ columnMode }) {
   //   }
   // }, [uiState]);
 
+  const itemsSelector = '.notification';
+  const jRef = useHotkeys('j', () => {
+    const activeItem = document.activeElement.closest(itemsSelector);
+    const activeItemRect = activeItem?.getBoundingClientRect();
+    const allItems = Array.from(
+      scrollableRef.current.querySelectorAll(itemsSelector),
+    );
+    if (
+      activeItem &&
+      activeItemRect.top < scrollableRef.current.clientHeight &&
+      activeItemRect.bottom > 0
+    ) {
+      const activeItemIndex = allItems.indexOf(activeItem);
+      let nextItem = allItems[activeItemIndex + 1];
+      if (nextItem) {
+        nextItem.focus();
+        nextItem.scrollIntoView(scrollIntoViewOptions);
+      }
+    } else {
+      const topmostItem = allItems.find((item) => {
+        const itemRect = item.getBoundingClientRect();
+        return itemRect.top >= 44 && itemRect.left >= 0;
+      });
+      if (topmostItem) {
+        topmostItem.focus();
+        topmostItem.scrollIntoView(scrollIntoViewOptions);
+      }
+    }
+  });
+
+  const kRef = useHotkeys('k', () => {
+    // focus on previous status after active item
+    const activeItem = document.activeElement.closest(itemsSelector);
+    const activeItemRect = activeItem?.getBoundingClientRect();
+    const allItems = Array.from(
+      scrollableRef.current.querySelectorAll(itemsSelector),
+    );
+    if (
+      activeItem &&
+      activeItemRect.top < scrollableRef.current.clientHeight &&
+      activeItemRect.bottom > 0
+    ) {
+      const activeItemIndex = allItems.indexOf(activeItem);
+      let prevItem = allItems[activeItemIndex - 1];
+      if (prevItem) {
+        prevItem.focus();
+        prevItem.scrollIntoView(scrollIntoViewOptions);
+      }
+    } else {
+      const topmostItem = allItems.find((item) => {
+        const itemRect = item.getBoundingClientRect();
+        return itemRect.top >= 44 && itemRect.left >= 0;
+      });
+      if (topmostItem) {
+        topmostItem.focus();
+        topmostItem.scrollIntoView(scrollIntoViewOptions);
+      }
+    }
+  });
+
+  const oRef = useHotkeys(['enter', 'o'], () => {
+    const activeItem = document.activeElement.closest(itemsSelector);
+    const statusLink = activeItem?.querySelector('.status-link');
+    if (statusLink) {
+      statusLink.click();
+    }
+  });
+
   return (
     <div
       id="notifications-page"
       class="deck-container"
-      ref={scrollableRef}
+      ref={(node) => {
+        scrollableRef.current = node;
+        jRef.current = node;
+        kRef.current = node;
+        oRef.current = node;
+      }}
       tabIndex="-1"
     >
       <div class={`timeline-deck deck ${onlyMentions ? 'only-mentions' : ''}`}>
@@ -283,6 +425,11 @@ function Notifications({ columnMode }) {
           onClick={(e) => {
             if (!e.target.closest('a, button')) {
               scrollableRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }}
+          onDblClick={(e) => {
+            if (!e.target.closest('a, button')) {
+              loadNotifications(true);
             }
           }}
           class={uiState === 'loading' ? 'loading' : ''}
@@ -296,7 +443,17 @@ function Notifications({ columnMode }) {
             </div>
             <h1>Notifications</h1>
             <div class="header-side">
-              {/* <Loader hidden={uiState !== 'loading'} /> */}
+              {supportsFilteredNotifications && (
+                <button
+                  type="button"
+                  class="button plain4"
+                  onClick={() => {
+                    setShowNotificationsSettings(true);
+                  }}
+                >
+                  <Icon icon="settings" size="l" alt="Notifications settings" />
+                </button>
+              )}
             </div>
           </div>
           {showNew && uiState !== 'loading' && (
@@ -401,6 +558,76 @@ function Notifications({ columnMode }) {
             )}
           </div>
         )}
+        {supportsFilteredNotifications &&
+          notificationsPolicy?.summary?.pendingRequestsCount > 0 && (
+            <div class="shazam-container">
+              <div class="shazam-container-inner">
+                <div class="filtered-notifications">
+                  <details
+                    onToggle={async (e) => {
+                      const { open } = e.target;
+                      if (open) {
+                        const requests = await fetchNotificationsRequest();
+                        setNotificationsRequests(requests);
+                        console.log({ open, requests });
+                      }
+                    }}
+                  >
+                    <summary>
+                      Filtered notifications from{' '}
+                      {notificationsPolicy.summary.pendingRequestsCount} people
+                    </summary>
+                    {!notificationsRequests ? (
+                      <p class="ui-state">
+                        <Loader abrupt />
+                      </p>
+                    ) : (
+                      notificationsRequests?.length > 0 && (
+                        <ul>
+                          {notificationsRequests.map((request) => (
+                            <li key={request.id}>
+                              <div class="request-notifcations">
+                                {!request.lastStatus?.id && (
+                                  <AccountBlock
+                                    useAvatarStatic
+                                    showStats
+                                    account={request.account}
+                                  />
+                                )}
+                                {request.lastStatus?.id && (
+                                  <div class="last-post">
+                                    <Link
+                                      class="status-link"
+                                      to={`/${instance}/s/${request.lastStatus.id}`}
+                                    >
+                                      <Status
+                                        status={request.lastStatus}
+                                        size="s"
+                                        readOnly
+                                      />
+                                    </Link>
+                                  </div>
+                                )}
+                                <NotificationRequestModalButton
+                                  request={request}
+                                />
+                              </div>
+                              <NotificationRequestButtons
+                                request={request}
+                                onChange={() => {
+                                  loadNotifications(true);
+                                }}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    )}
+                  </details>
+                </div>
+              </div>
+            </div>
+          )}
         <div id="mentions-option">
           <label>
             <input
@@ -414,7 +641,7 @@ function Notifications({ columnMode }) {
           </label>
         </div>
         <h2 class="timeline-header">Today</h2>
-        {showTodayEmpty && !!snapStates.notifications.length && (
+        {showTodayEmpty && (
           <p class="ui-state insignificant">
             {uiState === 'default' ? "You're all caught up." : <>&hellip;</>}
           </p>
@@ -509,6 +736,109 @@ function Notifications({ columnMode }) {
           </InView>
         )}
       </div>
+      {supportsFilteredNotifications && showNotificationsSettings && (
+        <Modal
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowNotificationsSettings(false);
+            }
+          }}
+        >
+          <div class="sheet" id="notifications-settings" tabIndex="-1">
+            <button
+              type="button"
+              class="sheet-close"
+              onClick={() => setShowNotificationsSettings(false)}
+            >
+              <Icon icon="x" />
+            </button>
+            <header>
+              <h2>Notifications settings</h2>
+            </header>
+            <main>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const {
+                    filterNotFollowing,
+                    filterNotFollowers,
+                    filterNewAccounts,
+                    filterPrivateMentions,
+                  } = e.target;
+                  const allFilters = {
+                    filterNotFollowing: filterNotFollowing.checked,
+                    filterNotFollowers: filterNotFollowers.checked,
+                    filterNewAccounts: filterNewAccounts.checked,
+                    filterPrivateMentions: filterPrivateMentions.checked,
+                  };
+                  setNotificationsPolicy({
+                    ...notificationsPolicy,
+                    ...allFilters,
+                  });
+                  setShowNotificationsSettings(false);
+                  (async () => {
+                    try {
+                      await masto.v1.notifications.policy.update(allFilters);
+                      showToast('Notifications settings updated');
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  })();
+                }}
+              >
+                <p>Filter out notifications from people:</p>
+                <p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      switch
+                      defaultChecked={notificationsPolicy.filterNotFollowing}
+                      name="filterNotFollowing"
+                    />{' '}
+                    You don't follow
+                  </label>
+                </p>
+                <p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      switch
+                      defaultChecked={notificationsPolicy.filterNotFollowers}
+                      name="filterNotFollowers"
+                    />{' '}
+                    Who don't follow you
+                  </label>
+                </p>
+                <p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      switch
+                      defaultChecked={notificationsPolicy.filterNewAccounts}
+                      name="filterNewAccounts"
+                    />{' '}
+                    With a new account
+                  </label>
+                </p>
+                <p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      switch
+                      defaultChecked={notificationsPolicy.filterPrivateMentions}
+                      name="filterPrivateMentions"
+                    />{' '}
+                    Who unsolicitedly private mention you
+                  </label>
+                </p>
+                <p>
+                  <button type="submit">Save</button>
+                </p>
+              </form>
+            </main>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -588,6 +918,188 @@ function AnnouncementBlock({ announcement }) {
         })}
       </div>
     </div>
+  );
+}
+
+function fetchNotficationsByAccount(accountID) {
+  const { masto } = api();
+  return masto.v1.notifications.list({
+    accountID,
+  });
+}
+function NotificationRequestModalButton({ request }) {
+  const { instance } = api();
+  const [uiState, setUIState] = useState('loading');
+  const { account, lastStatus } = request;
+  const [showModal, setShowModal] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  function onClose() {
+    setShowModal(false);
+  }
+
+  useEffect(() => {
+    if (!request?.account?.id) return;
+    if (!showModal) return;
+    setUIState('loading');
+    (async () => {
+      const notifs = await fetchNotficationsByAccount(request.account.id);
+      setNotifications(notifs || []);
+      setUIState('default');
+    })();
+  }, [showModal, request?.account?.id]);
+
+  return (
+    <>
+      <button
+        type="button"
+        class="plain4 request-notifications-account"
+        onClick={() => {
+          setShowModal(true);
+        }}
+      >
+        <Icon icon="notification" class="more-insignificant" />{' '}
+        <small>View notifications from @{account.username}</small>{' '}
+        <Icon icon="chevron-down" />
+      </button>
+      {showModal && (
+        <Modal
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              onClose();
+            }
+          }}
+        >
+          <div class="sheet" tabIndex="-1">
+            <button type="button" class="sheet-close" onClick={onClose}>
+              <Icon icon="x" />
+            </button>
+            <header>
+              <b>Notifications from @{account.username}</b>
+            </header>
+            <main>
+              {uiState === 'loading' ? (
+                <p class="ui-state">
+                  <Loader abrupt />
+                </p>
+              ) : (
+                notifications.map((notification) => (
+                  <div
+                    class="notification-peek"
+                    onClick={(e) => {
+                      const { target } = e;
+                      // If button or links
+                      if (
+                        e.target.tagName === 'BUTTON' ||
+                        e.target.tagName === 'A'
+                      ) {
+                        onClose();
+                      }
+                    }}
+                  >
+                    <Notification
+                      instance={instance}
+                      notification={notification}
+                      isStatic
+                    />
+                  </div>
+                ))
+              )}
+            </main>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function NotificationRequestButtons({ request, onChange }) {
+  const { masto } = api();
+  const [uiState, setUIState] = useState('default');
+  const [requestState, setRequestState] = useState(null); // accept, dismiss
+  const hasRequestState = requestState !== null;
+
+  return (
+    <p class="notification-request-buttons">
+      <button
+        type="button"
+        disabled={uiState === 'loading' || hasRequestState}
+        onClick={() => {
+          setUIState('loading');
+          (async () => {
+            try {
+              await masto.v1.notifications.requests
+                .$select(request.id)
+                .accept();
+              setRequestState('accept');
+              setUIState('default');
+              onChange({
+                request,
+                state: 'accept',
+              });
+              showToast(
+                `Notifications from @${request.account.username} will not be filtered from now on.`,
+              );
+            } catch (error) {
+              setUIState('error');
+              console.error(error);
+              showToast(`Unable to accept notification request`);
+            }
+          })();
+        }}
+      >
+        Allow
+      </button>{' '}
+      <button
+        type="button"
+        disabled={uiState === 'loading' || hasRequestState}
+        class="light danger"
+        onClick={() => {
+          setUIState('loading');
+          (async () => {
+            try {
+              await masto.v1.notifications.requests
+                .$select(request.id)
+                .dismiss();
+              setRequestState('dismiss');
+              setUIState('default');
+              onChange({
+                request,
+                state: 'dismiss',
+              });
+              showToast(
+                `Notifications from @${request.account.username} will not show up in Filtered notifications from now on.`,
+              );
+            } catch (error) {
+              setUIState('error');
+              console.error(error);
+              showToast(`Unable to dismiss notification request`);
+            }
+          })();
+        }}
+      >
+        Dismiss
+      </button>
+      <span class="notification-request-states">
+        {uiState === 'loading' ? (
+          <Loader abrupt />
+        ) : requestState === 'accept' ? (
+          <Icon
+            icon="check-circle"
+            alt="Accepted"
+            class="notification-accepted"
+          />
+        ) : (
+          requestState === 'dismiss' && (
+            <Icon
+              icon="x-circle"
+              alt="Dismissed"
+              class="notification-dismissed"
+            />
+          )
+        )}
+      </span>
+    </p>
   );
 }
 

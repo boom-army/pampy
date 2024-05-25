@@ -9,7 +9,7 @@ const notificationTypeKeys = {
   poll: ['status'],
   update: ['status'],
 };
-function fixNotifications(notifications) {
+export function fixNotifications(notifications) {
   return notifications.filter((notification) => {
     const { type, id, createdAt } = notification;
     if (!type) {
@@ -63,11 +63,11 @@ function groupNotifications(notifications) {
         mappedNotification.id += `-${id}`;
       }
     } else {
-      account._types = [type];
+      if (account) account._types = [type];
       let n = (notificationsMap[key] = {
         ...notification,
         type: virtualType,
-        _accounts: [account],
+        _accounts: account ? [account] : [],
       });
       cleanNotifications[j++] = n;
     }

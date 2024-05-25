@@ -8,11 +8,10 @@ import ListAddEdit from '../components/list-add-edit';
 import Loader from '../components/loader';
 import Modal from '../components/modal';
 import NavMenu from '../components/nav-menu';
-import { api } from '../utils/api';
+import { fetchLists } from '../utils/lists';
 import useTitle from '../utils/useTitle';
 
 function Lists() {
-  const { masto } = api();
   useTitle(`Lists`, `/l`);
   const [uiState, setUIState] = useState('default');
 
@@ -22,8 +21,7 @@ function Lists() {
     setUIState('loading');
     (async () => {
       try {
-        const lists = await masto.v1.lists.list();
-        lists.sort((a, b) => a.title.localeCompare(b.title));
+        const lists = await fetchLists();
         console.log(lists);
         setLists(lists);
         setUIState('default');
@@ -61,14 +59,15 @@ function Lists() {
         </header>
         <main>
           {lists.length > 0 ? (
-            <ul class="link-list">
-              {lists.map((list) => (
-                <li>
-                  <Link to={`/l/${list.id}`}>
-                    <span>
-                      <Icon icon="list" /> <span>{list.title}</span>
-                    </span>
-                    {/* <button
+            <>
+              <ul class="link-list">
+                {lists.map((list) => (
+                  <li>
+                    <Link to={`/l/${list.id}`}>
+                      <span>
+                        <Icon icon="list" /> <span>{list.title}</span>
+                      </span>
+                      {/* <button
                       type="button"
                       class="plain"
                       onClick={(e) => {
@@ -81,10 +80,19 @@ function Lists() {
                     >
                       <Icon icon="pencil" />
                     </button> */}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {lists.length > 1 && (
+                <footer class="ui-state">
+                  <small class="insignificant">
+                    {lists.length} list
+                    {lists.length === 1 ? '' : 's'}
+                  </small>
+                </footer>
+              )}
+            </>
           ) : uiState === 'loading' ? (
             <p class="ui-state">
               <Loader />
@@ -98,7 +106,6 @@ function Lists() {
       </div>
       {showListAddEditModal && (
         <Modal
-          class="light"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowListAddEditModal(false);

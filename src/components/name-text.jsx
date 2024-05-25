@@ -7,6 +7,10 @@ import states from '../utils/states';
 import Avatar from './avatar';
 import EmojiText from './emoji-text';
 
+const nameCollator = new Intl.Collator('en', {
+  sensitivity: 'base',
+});
+
 function NameText({
   account,
   instance,
@@ -36,9 +40,7 @@ function NameText({
     (trimmedUsername === trimmedDisplayName ||
       trimmedUsername === shortenedDisplayName ||
       trimmedUsername === shortenedAlphaNumericDisplayName ||
-      trimmedUsername.localeCompare?.(shortenedDisplayName, 'en', {
-        sensitivity: 'base',
-      }) === 0)
+      nameCollator.compare(trimmedUsername, shortenedDisplayName) === 0)
   ) {
     username = null;
   }
@@ -48,7 +50,11 @@ function NameText({
       class={`name-text ${showAcct ? 'show-acct' : ''} ${short ? 'short' : ''}`}
       href={url}
       target={external ? '_blank' : null}
-      title={`${displayName ? `${displayName} ` : ''}@${acct}`}
+      title={
+        displayName
+          ? `${displayName} (${acct2 ? '' : '@'}${acct})`
+          : `${acct2 ? '' : '@'}${acct}`
+      }
       onClick={(e) => {
         if (external) return;
         e.preventDefault();
@@ -86,8 +92,9 @@ function NameText({
         <>
           <br />
           <i>
-            @{acct1}
-            <span class="ib">{acct2}</span>
+            {acct2 ? '' : '@'}
+            {acct1}
+            {!!acct2 && <span class="ib">{acct2}</span>}
           </i>
         </>
       )}
@@ -95,4 +102,9 @@ function NameText({
   );
 }
 
-export default memo(NameText);
+export default memo(NameText, (oldProps, newProps) => {
+  // Only care about account.id, the other props usually don't change
+  const { account } = oldProps;
+  const { account: newAccount } = newProps;
+  return account?.acct === newAccount?.acct;
+});

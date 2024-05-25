@@ -4,6 +4,8 @@ import { createPortal } from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
 import { useHotkeys } from 'react-hotkeys-hook';
 
+import useCloseWatcher from '../utils/useCloseWatcher';
+
 const $modalContainer = document.getElementById('modal-container');
 
 function Modal({ children, onClose, onClick, class: className }) {
@@ -20,6 +22,7 @@ function Modal({ children, onClose, onClick, class: className }) {
     return () => clearTimeout(timer);
   }, []);
 
+  const supportsCloseWatcher = window.CloseWatcher;
   const escRef = useHotkeys(
     'esc',
     () => {
@@ -28,7 +31,7 @@ function Modal({ children, onClose, onClick, class: className }) {
       }, 0);
     },
     {
-      enabled: !!onClose,
+      enabled: !supportsCloseWatcher && !!onClose,
       // Using keyup and setTimeout above
       // This will run "later" to prevent clash with esc handlers from other components
       keydown: false,
@@ -36,6 +39,25 @@ function Modal({ children, onClose, onClick, class: className }) {
     },
     [onClose],
   );
+  useCloseWatcher(onClose, [onClose]);
+
+  useEffect(() => {
+    const $deckContainers = document.querySelectorAll('.deck-container');
+    if (children) {
+      $deckContainers.forEach(($deckContainer) => {
+        $deckContainer.setAttribute('inert', '');
+      });
+    } else {
+      $deckContainers.forEach(($deckContainer) => {
+        $deckContainer.removeAttribute('inert');
+      });
+    }
+    return () => {
+      $deckContainers.forEach(($deckContainer) => {
+        $deckContainer.removeAttribute('inert');
+      });
+    };
+  }, [children]);
 
   const Modal = (
     <div
@@ -52,8 +74,19 @@ function Modal({ children, onClose, onClick, class: className }) {
       }}
       tabIndex="-1"
       onFocus={(e) => {
-        if (e.target === e.currentTarget) {
-          modalRef.current?.querySelector?.('[tabindex="-1"]')?.focus?.();
+        try {
+          if (e.target === e.currentTarget) {
+            const focusElement =
+              modalRef.current?.querySelector('[tabindex="-1"]');
+            const isFocusable =
+              !!focusElement &&
+              getComputedStyle(focusElement)?.pointerEvents !== 'none';
+            if (focusElement && isFocusable) {
+              focusElement.focus();
+            }
+          }
+        } catch (err) {
+          console.error(err);
         }
       }}
     >

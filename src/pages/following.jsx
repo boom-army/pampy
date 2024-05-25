@@ -6,7 +6,11 @@ import { api } from '../utils/api';
 import { filteredItems } from '../utils/filters';
 import states from '../utils/states';
 import { getStatus, saveStatus } from '../utils/states';
-import { dedupeBoosts } from '../utils/timeline-utils';
+import {
+  assignFollowedTags,
+  clearFollowedTagsState,
+  dedupeBoosts,
+} from '../utils/timeline-utils';
 import useTitle from '../utils/useTitle';
 
 const LIMIT = 20;
@@ -27,7 +31,11 @@ function Following({ title, path, id, ...props }) {
     const results = await homeIterator.current.next();
     let { value } = results;
     if (value?.length) {
+      let latestItemChanged = false;
       if (firstLoad) {
+        if (value[0].id !== latestItem.current) {
+          latestItemChanged = true;
+        }
         latestItem.current = value[0].id;
         console.log('First load', latestItem.current);
       }
@@ -37,6 +45,8 @@ function Following({ title, path, id, ...props }) {
         saveStatus(item, instance);
       });
       value = dedupeBoosts(value, instance);
+      if (firstLoad && latestItemChanged) clearFollowedTagsState();
+      assignFollowedTags(value, instance);
 
       // ENFORCE sort by datetime (Latest first)
       value.sort((a, b) => {
@@ -61,7 +71,8 @@ function Following({ title, path, id, ...props }) {
         .next();
       let { value } = results;
       console.log('checkForUpdates', latestItem.current, value);
-      if (value?.length) {
+      const valueContainsLatestItem = value[0]?.id === latestItem.current; // since_id might not be supported
+      if (value?.length && !valueContainsLatestItem) {
         latestItem.current = value[0].id;
         value = dedupeBoosts(value, instance);
         value = filteredItems(value, 'home');
@@ -95,6 +106,7 @@ function Following({ title, path, id, ...props }) {
             if (s) s._deleted = true;
           }
         }
+        console.log('💥 Streaming user loop STOPPED');
       }
     })();
     return () => {
@@ -117,6 +129,8 @@ function Following({ title, path, id, ...props }) {
       {...props}
       // allowFilters
       filterContext="home"
+      showFollowedTags
+      showReplyParent
     />
   );
 }

@@ -4,8 +4,10 @@ import store from './store';
 import {
   getAccount,
   getAccountByAccessToken,
+  getAccountByInstance,
   getCurrentAccount,
   saveAccount,
+  setCurrentAccountID,
 } from './store-utils';
 
 // Default *fallback* instance
@@ -117,7 +119,7 @@ export async function initAccount(client, instance, accessToken, vapidKey) {
   const mastoAccount = await masto.v1.accounts.verifyCredentials();
 
   console.log('CURRENTACCOUNT SET', mastoAccount.id);
-  store.session.set('currentAccount', mastoAccount.id);
+  setCurrentAccountID(mastoAccount.id);
 
   saveAccount({
     info: mastoAccount,
@@ -244,6 +246,22 @@ export function api({ instance, accessToken, accountID, account } = {}) {
         masto: currentAccountApi.masto,
         streaming: currentAccountApi.streaming,
         client: currentAccountApi,
+        authenticated: true,
+        instance,
+      };
+    }
+
+    const instanceAccount = getAccountByInstance(instance);
+    if (instanceAccount) {
+      const accessToken = instanceAccount.accessToken;
+      const client =
+        accountApis[instance]?.[accessToken] ||
+        initClient({ instance, accessToken });
+      const { masto, streaming } = client;
+      return {
+        masto,
+        streaming,
+        client,
         authenticated: true,
         instance,
       };

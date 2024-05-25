@@ -1,9 +1,13 @@
+import { deepEqual } from 'fast-equals';
 import { proxy, subscribe } from 'valtio';
 import { subscribeKey } from 'valtio/utils';
 
 import { api } from './api';
+import isMastodonLinkMaybe from './isMastodonLinkMaybe';
 import pmem from './pmem';
+import rateLimit from './ratelimit';
 import store from './store';
+import unfurlMastodonLink from './unfurl-link';
 
 const states = proxy({
   appVersion: {},
@@ -28,9 +32,12 @@ const states = proxy({
     counter: 0,
   },
   spoilers: {},
+  spoilersMedia: {},
   scrollPositions: {},
   unfurledLinks: {},
   statusQuotes: {},
+  statusFollowedTags: {},
+  statusReply: {},
   accounts: {},
   routeNotification: null,
   // Modals
@@ -44,6 +51,8 @@ const states = proxy({
   showKeyboardShortcutsHelp: false,
   showGenericAccounts: false,
   showMediaAlt: false,
+  showEmbedModal: false,
+  showReportModal: false,
   // Shortcuts
   shortcuts: [],
   // Settings
@@ -56,6 +65,9 @@ const states = proxy({
     contentTranslationTargetLanguage: null,
     contentTranslationHideLanguages: [],
     contentTranslationAutoInline: false,
+    shortcutSettingsCloudImportExport: false,
+    mediaAltGenerator: false,
+    composerGIFPicker: false,
     cloakMode: false,
   },
 });
@@ -84,6 +96,12 @@ export function initStates() {
     store.account.get('settings-contentTranslationHideLanguages') || [];
   states.settings.contentTranslationAutoInline =
     store.account.get('settings-contentTranslationAutoInline') ?? false;
+  states.settings.shortcutSettingsCloudImportExport =
+    store.account.get('settings-shortcutSettingsCloudImportExport') ?? false;
+  states.settings.mediaAltGenerator =
+    store.account.get('settings-mediaAltGenerator') ?? false;
+  states.settings.composerGIFPicker =
+    store.account.get('settings-composerGIFPicker') ?? false;
   states.settings.cloakMode = store.account.get('settings-cloakMode') ?? false;
 }
 
@@ -109,6 +127,9 @@ subscribe(states, (changes) => {
     if (path.join('.') === 'settings.contentTranslationAutoInline') {
       store.account.set('settings-contentTranslationAutoInline', !!value);
     }
+    if (path.join('.') === 'settings.shortcutSettingsCloudImportExport') {
+      store.account.set('settings-shortcutSettingsCloudImportExport', !!value);
+    }
     if (path.join('.') === 'settings.contentTranslationTargetLanguage') {
       console.log('SET', value);
       store.account.set('settings-contentTranslationTargetLanguage', value);
@@ -118,6 +139,12 @@ subscribe(states, (changes) => {
         'settings-contentTranslationHideLanguages',
         states.settings.contentTranslationHideLanguages,
       );
+    }
+    if (path.join('.') === 'settings.mediaAltGenerator') {
+      store.account.set('settings-mediaAltGenerator', !!value);
+    }
+    if (path.join('.') === 'settings.composerGIFPicker') {
+      store.account.set('settings-composerGIFPicker', !!value);
     }
     if (path?.[0] === 'shortcuts') {
       store.account.set('shortcuts', states.shortcuts);
@@ -139,6 +166,7 @@ export function hideAllModals() {
   states.showKeyboardShortcutsHelp = false;
   states.showGenericAccounts = false;
   states.showMediaAlt = false;
+  states.showEmbedModal = false;
 }
 
 export function statusKey(id, instance) {
@@ -159,34 +187,52 @@ export function saveStatus(status, instance, opts) {
     opts = instance;
     instance = null;
   }
-  const { override, skipThreading } = Object.assign(
-    { override: true, skipThreading: false },
-    opts,
-  );
+  const {
+    override = true,
+    skipThreading = false,
+    skipUnfurling = false,
+  } = opts || {};
   if (!status) return;
   const oldStatus = getStatus(status.id, instance);
   if (!override && oldStatus) return;
-  const key = statusKey(status.id, instance);
-  if (oldStatus?._pinned) status._pinned = oldStatus._pinned;
-  // if (oldStatus?._filtered) status._filtered = oldStatus._filtered;
-  states.statuses[key] = status;
-  if (status.reblog) {
-    const key = statusKey(status.reblog.id, instance);
-    states.statuses[key] = status.reblog;
-  }
+  if (deepEqual(status, oldStatus)) return;
+  queueMicrotask(() => {
+    const key = statusKey(status.id, instance);
+    if (oldStatus?._pinned) status._pinned = oldStatus._pinned;
+    // if (oldStatus?._filtered) status._filtered = oldStatus._filtered;
+    states.statuses[key] = status;
+    if (status.reblog?.id) {
+      const srKey = statusKey(status.reblog.id, instance);
+      states.statuses[srKey] = status.reblog;
+    }
+    if (status.quote?.id) {
+      const sKey = statusKey(status.quote.id, instance);
+      states.statuses[sKey] = status.quote;
+      states.statusQuotes[key] = [
+        {
+          id: status.quote.id,
+          instance,
+        },
+      ];
+    }
+  });
 
   // THREAD TRAVERSER
   if (!skipThreading) {
-    requestAnimationFrame(() => {
-      threadifyStatus(status, instance);
-      if (status.reblog) {
-        threadifyStatus(status.reblog, instance);
-      }
+    queueMicrotask(() => {
+      threadifyStatus(status.reblog || status, instance);
+    });
+  }
+
+  // UNFURLER
+  if (!skipUnfurling) {
+    queueMicrotask(() => {
+      unfurlStatus(status.reblog || status, instance);
     });
   }
 }
 
-export function threadifyStatus(status, propInstance) {
+function _threadifyStatus(status, propInstance) {
   const { masto, instance } = api({ instance: propInstance });
   // Return all statuses in the thread, via inReplyToId, if inReplyToAccountId === account.id
   let fetchIndex = 0;
@@ -224,6 +270,39 @@ export function threadifyStatus(status, propInstance) {
     .catch((e) => {
       console.error(e, status);
     });
+}
+export const threadifyStatus = rateLimit(_threadifyStatus, 100);
+
+const fauxDiv = document.createElement('div');
+export function unfurlStatus(status, instance) {
+  const { instance: currentInstance } = api();
+  const content = status?.content;
+  const hasLink = /<a/i.test(content);
+  if (hasLink) {
+    const sKey = statusKey(status?.id, instance);
+    fauxDiv.innerHTML = content;
+    const links = fauxDiv.querySelectorAll(
+      'a[href]:not(.u-url):not(.mention):not(.hashtag)',
+    );
+    [...links]
+      .filter((a) => {
+        const url = a.href;
+        const isPostItself = url === status.url || url === status.uri;
+        return !isPostItself && isMastodonLinkMaybe(url);
+      })
+      .forEach((a, i) => {
+        unfurlMastodonLink(currentInstance, a.href).then((result) => {
+          if (!result) return;
+          if (!sKey) return;
+          if (!Array.isArray(states.statusQuotes[sKey])) {
+            states.statusQuotes[sKey] = [];
+          }
+          if (!states.statusQuotes[sKey][i]) {
+            states.statusQuotes[sKey].splice(i, 0, result);
+          }
+        });
+      });
+  }
 }
 
 const fetchStatus = pmem((statusID, masto) => {

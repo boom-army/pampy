@@ -1,6 +1,6 @@
 import './lists.css';
 
-import { Menu, MenuItem } from '@szhsin/react-menu';
+import { Menu, MenuDivider, MenuItem } from '@szhsin/react-menu';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { InView } from 'react-intersection-observer';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -12,10 +12,12 @@ import Link from '../components/link';
 import ListAddEdit from '../components/list-add-edit';
 import Menu2 from '../components/menu2';
 import MenuConfirm from '../components/menu-confirm';
+import MenuLink from '../components/menu-link';
 import Modal from '../components/modal';
 import Timeline from '../components/timeline';
 import { api } from '../utils/api';
 import { filteredItems } from '../utils/filters';
+import { getList, getLists } from '../utils/lists';
 import states, { saveStatus } from '../utils/states';
 import useTitle from '../utils/useTitle';
 
@@ -61,8 +63,9 @@ function List(props) {
         since_id: latestItem.current,
       });
       let { value } = results;
-      value = filteredItems(value, 'home');
-      if (value?.length) {
+      const valueContainsLatestItem = value[0]?.id === latestItem.current; // since_id might not be supported
+      if (value?.length && !valueContainsLatestItem) {
+        value = filteredItems(value, 'home');
         return true;
       }
       return false;
@@ -71,13 +74,18 @@ function List(props) {
     }
   }
 
+  const [lists, setLists] = useState([]);
+  useEffect(() => {
+    getLists().then(setLists);
+  }, []);
+
   const [list, setList] = useState({ title: 'List' });
   // const [title, setTitle] = useState(`List`);
   useTitle(list.title, `/l/:id`);
   useEffect(() => {
     (async () => {
       try {
-        const list = await masto.v1.lists.$select(id).fetch();
+        const list = await getList(id);
         setList(list);
         // setTitle(list.title);
       } catch (e) {
@@ -104,11 +112,35 @@ function List(props) {
         boostsCarousel={snapStates.settings.boostsCarousel}
         // allowFilters
         filterContext="home"
+        showReplyParent
         // refresh={reloadCount}
         headerStart={
-          <Link to="/l" class="button plain">
-            <Icon icon="list" size="l" />
-          </Link>
+          // <Link to="/l" class="button plain">
+          //   <Icon icon="list" size="l" />
+          // </Link>
+          <Menu2
+            overflow="auto"
+            menuButton={
+              <button type="button" class="plain">
+                <Icon icon="list" size="l" alt="Lists" />
+                <Icon icon="chevron-down" size="s" />
+              </button>
+            }
+          >
+            <MenuLink to="/l">
+              <span>All Lists</span>
+            </MenuLink>
+            {lists?.length > 0 && (
+              <>
+                <MenuDivider />
+                {lists.map((list) => (
+                  <MenuLink key={list.id} to={`/l/${list.id}`}>
+                    <span>{list.title}</span>
+                  </MenuLink>
+                ))}
+              </>
+            )}
+          </Menu2>
         }
         headerEnd={
           <Menu2
@@ -142,7 +174,6 @@ function List(props) {
       />
       {showListAddEditModal && (
         <Modal
-          class="light"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowListAddEditModal(false);
@@ -166,7 +197,6 @@ function List(props) {
       )}
       {showManageMembersModal && (
         <Modal
-          class="light"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowManageMembersModal(false);

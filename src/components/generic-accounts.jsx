@@ -4,15 +4,28 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { InView } from 'react-intersection-observer';
 import { useSnapshot } from 'valtio';
 
+import { api } from '../utils/api';
+import { fetchRelationships } from '../utils/relationships';
 import states from '../utils/states';
 import useLocationChange from '../utils/useLocationChange';
 
 import AccountBlock from './account-block';
 import Icon from './icon';
+import Link from './link';
 import Loader from './loader';
+import Status from './status';
 
-export default function GenericAccounts({ onClose = () => {} }) {
+export default function GenericAccounts({
+  instance,
+  excludeRelationshipAttrs = [],
+  postID,
+  onClose = () => {},
+  blankCopy = 'Nothing to show',
+}) {
+  const { masto, instance: currentInstance } = api();
+  const isCurrentInstance = instance ? instance === currentInstance : true;
   const snapStates = useSnapshot(states);
+  ``;
   const [uiState, setUIState] = useState('default');
   const [accounts, setAccounts] = useState([]);
   const [showMore, setShowMore] = useState(false);
@@ -31,6 +44,20 @@ export default function GenericAccounts({ onClose = () => {} }) {
     showReactions,
   } = snapStates.showGenericAccounts;
 
+  const [relationshipsMap, setRelationshipsMap] = useState({});
+
+  const loadRelationships = async (accounts) => {
+    if (!accounts?.length) return;
+    if (!isCurrentInstance) return;
+    const relationships = await fetchRelationships(accounts, relationshipsMap);
+    if (relationships) {
+      setRelationshipsMap({
+        ...relationshipsMap,
+        ...relationships,
+      });
+    }
+  };
+
   const loadAccounts = (firstLoad) => {
     if (!fetchAccounts) return;
     if (firstLoad) setAccounts([]);
@@ -40,11 +67,41 @@ export default function GenericAccounts({ onClose = () => {} }) {
         const { done, value } = await fetchAccounts(firstLoad);
         if (Array.isArray(value)) {
           if (firstLoad) {
-            setAccounts(value);
+            const accounts = [];
+            for (let i = 0; i < value.length; i++) {
+              const account = value[i];
+              const theAccount = accounts.find(
+                (a, j) => a.id === account.id && i !== j,
+              );
+              if (!theAccount) {
+                accounts.push({
+                  _types: [],
+                  ...account,
+                });
+              } else {
+                theAccount._types.push(...account._types);
+              }
+            }
+            setAccounts(accounts);
           } else {
-            setAccounts((prev) => [...prev, ...value]);
+            // setAccounts((prev) => [...prev, ...value]);
+            // Merge accounts by id and _types
+            setAccounts((prev) => {
+              const newAccounts = prev;
+              for (const account of value) {
+                const theAccount = newAccounts.find((a) => a.id === account.id);
+                if (!theAccount) {
+                  newAccounts.push(account);
+                } else {
+                  theAccount._types.push(...account._types);
+                }
+              }
+              return newAccounts;
+            });
           }
           setShowMore(!done);
+
+          loadRelationships(value);
         } else {
           setShowMore(false);
         }
@@ -60,6 +117,7 @@ export default function GenericAccounts({ onClose = () => {} }) {
   useEffect(() => {
     if (staticAccounts?.length > 0) {
       setAccounts(staticAccounts);
+      loadRelationships(staticAccounts);
     } else {
       loadAccounts(true);
       firstLoad.current = false;
@@ -75,6 +133,8 @@ export default function GenericAccounts({ onClose = () => {} }) {
     }
   }, [snapStates.reloadGenericAccounts.counter]);
 
+  const post = states.statuses[postID];
+
   return (
     <div id="generic-accounts-container" class="sheet" tabindex="-1">
       <button type="button" class="sheet-close" onClick={onClose}>
@@ -84,29 +144,48 @@ export default function GenericAccounts({ onClose = () => {} }) {
         <h2>{heading || 'Accounts'}</h2>
       </header>
       <main>
+        {post && (
+          <Link
+            to={`/${instance || currentInstance}/s/${post.id}`}
+            class="post-preview"
+          >
+            <Status status={post} size="s" readOnly />
+          </Link>
+        )}
         {accounts.length > 0 ? (
           <>
             <ul class="accounts-list">
-              {accounts.map((account) => (
-                <li key={account.id + (account._types || '')}>
-                  {showReactions && account._types?.length > 0 && (
-                    <div class="reactions-block">
-                      {account._types.map((type) => (
-                        <Icon
-                          icon={
-                            {
-                              reblog: 'rocket',
-                              favourite: 'heart',
-                            }[type]
-                          }
-                          class={`${type}-icon`}
-                        />
-                      ))}
+              {accounts.map((account) => {
+                const relationship = relationshipsMap[account.id];
+                const key = `${account.id}-${account._types?.length || ''}`;
+                return (
+                  <li key={key}>
+                    {showReactions && account._types?.length > 0 && (
+                      <div class="reactions-block">
+                        {account._types.map((type) => (
+                          <Icon
+                            icon={
+                              {
+                                reblog: 'rocket',
+                                favourite: 'heart',
+                              }[type]
+                            }
+                            class={`${type}-icon`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div class="account-relationships">
+                      <AccountBlock
+                        account={account}
+                        showStats
+                        relationship={relationship}
+                        excludeRelationshipAttrs={excludeRelationshipAttrs}
+                      />
                     </div>
-                  )}
-                  <AccountBlock account={account} />
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
             {uiState === 'default' ? (
               showMore ? (
@@ -143,7 +222,7 @@ export default function GenericAccounts({ onClose = () => {} }) {
         ) : uiState === 'error' ? (
           <p class="ui-state">Error loading accounts</p>
         ) : (
-          <p class="ui-state insignificant">Nothing to show</p>
+          <p class="ui-state insignificant">{blankCopy}</p>
         )}
       </main>
     </div>

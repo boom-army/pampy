@@ -14,22 +14,27 @@ import NavMenu from '../components/nav-menu';
 import SearchForm from '../components/search-form';
 import Status from '../components/status';
 import { api } from '../utils/api';
+import { fetchRelationships } from '../utils/relationships';
 import shortenNumber from '../utils/shorten-number';
+import usePageVisibility from '../utils/usePageVisibility';
 import useTitle from '../utils/useTitle';
 
 const SHORT_LIMIT = 5;
 const LIMIT = 40;
+const emptySearchParams = new URLSearchParams();
 
-function Search(props) {
-  const params = useParams();
+function Search({ columnMode, ...props }) {
+  const params = columnMode ? {} : useParams();
   const { masto, instance, authenticated } = api({
     instance: params.instance,
   });
   const [uiState, setUIState] = useState('default');
-  const [searchParams] = useSearchParams();
+  const [searchParams] = columnMode ? [emptySearchParams] : useSearchParams();
   const searchFormRef = useRef();
   const q = props?.query || searchParams.get('q');
-  const type = props?.type || searchParams.get('type');
+  const type = columnMode
+    ? 'statuses'
+    : props?.type || searchParams.get('type');
   useTitle(
     q
       ? `Search: ${q}${
@@ -72,7 +77,23 @@ function Search(props) {
     hashtags: setHashtagResults,
   };
 
+  const [relationshipsMap, setRelationshipsMap] = useState({});
+  const loadRelationships = async (accounts) => {
+    if (!accounts?.length) return;
+    const relationships = await fetchRelationships(accounts, relationshipsMap);
+    if (relationships) {
+      setRelationshipsMap({
+        ...relationshipsMap,
+        ...relationships,
+      });
+    }
+  };
+
   function loadResults(firstLoad) {
+    if (firstLoad) {
+      offsetRef.current = 0;
+    }
+
     if (!firstLoad && !authenticated) {
       // Search results pagination is only available to authenticated users
       return;
@@ -113,12 +134,14 @@ function Search(props) {
             setShowMore(!!length);
           }
         } else {
-          setStatusResults(results.statuses);
-          setAccountResults(results.accounts);
-          setHashtagResults(results.hashtags);
+          setStatusResults(results.statuses || []);
+          setAccountResults(results.accounts || []);
+          setHashtagResults(results.hashtags || []);
           offsetRef.current = 0;
           setShowMore(false);
         }
+        loadRelationships(results.accounts);
+
         setUIState('default');
       } catch (err) {
         console.error(err);
@@ -127,9 +150,23 @@ function Search(props) {
     })();
   }
 
+  const lastHiddenTime = useRef();
+  usePageVisibility((visible) => {
+    const reachStart = scrollableRef.current?.scrollTop === 0;
+    if (visible && reachStart) {
+      const timeDiff = Date.now() - lastHiddenTime.current;
+      if (!lastHiddenTime.current || timeDiff > 1000 * 3) {
+        // 3 seconds
+        loadResults(true);
+      } else {
+        lastHiddenTime.current = Date.now();
+      }
+    }
+  });
+
   useEffect(() => {
+    searchFormRef.current?.setValue?.(q || '');
     if (q) {
-      searchFormRef.current?.setValue?.(q);
       loadResults(true);
     } else {
       searchFormRef.current?.focus?.();
@@ -137,9 +174,10 @@ function Search(props) {
   }, [q, type, instance]);
 
   useHotkeys(
-    '/',
+    ['/', 'Slash'],
     (e) => {
       searchFormRef.current?.focus?.();
+      searchFormRef.current?.select?.();
     },
     {
       preventDefault: true,
@@ -157,11 +195,22 @@ function Search(props) {
               <NavMenu />
             </div>
             <SearchForm ref={searchFormRef} />
-            <div class="header-side">&nbsp;</div>
+            <div class="header-side">
+              <button
+                type="button"
+                class="plain"
+                onClick={() => {
+                  loadResults(true);
+                }}
+                disabled={uiState === 'loading'}
+              >
+                <Icon icon="search" size="l" />
+              </button>
+            </div>
           </div>
         </header>
         <main>
-          {!!q && (
+          {!!q && !columnMode && (
             <div
               ref={filterBarParent}
               class={`filter-bar ${uiState === 'loading' ? 'loading' : ''}`}
@@ -205,7 +254,14 @@ function Search(props) {
               {(!type || type === 'accounts') && (
                 <>
                   {type !== 'accounts' && (
-                    <h2 class="timeline-header">Accounts</h2>
+                    <h2 class="timeline-header">
+                      Accounts{' '}
+                      <Link
+                        to={`/search?q=${encodeURIComponent(q)}&type=accounts`}
+                      >
+                        <Icon icon="arrow-right" size="l" />
+                      </Link>
+                    </h2>
                   )}
                   {accountResults.length > 0 ? (
                     <>
@@ -216,6 +272,7 @@ function Search(props) {
                               account={account}
                               instance={instance}
                               showStats
+                              relationship={relationshipsMap[account.id]}
                             />
                           </li>
                         ))}
@@ -224,7 +281,9 @@ function Search(props) {
                         <div class="ui-state">
                           <Link
                             class="plain button"
-                            to={`/search?q=${q}&type=accounts`}
+                            to={`/search?q=${encodeURIComponent(
+                              q,
+                            )}&type=accounts`}
                           >
                             See more accounts <Icon icon="arrow-right" />
                           </Link>
@@ -246,28 +305,35 @@ function Search(props) {
               {(!type || type === 'hashtags') && (
                 <>
                   {type !== 'hashtags' && (
-                    <h2 class="timeline-header">Hashtags</h2>
+                    <h2 class="timeline-header">
+                      Hashtags{' '}
+                      <Link
+                        to={`/search?q=${encodeURIComponent(q)}&type=hashtags`}
+                      >
+                        <Icon icon="arrow-right" size="l" />
+                      </Link>
+                    </h2>
                   )}
                   {hashtagResults.length > 0 ? (
                     <>
                       <ul class="link-list hashtag-list">
                         {hashtagResults.map((hashtag) => {
                           const { name, history } = hashtag;
-                          const total = history.reduce(
+                          const total = history?.reduce?.(
                             (acc, cur) => acc + +cur.uses,
                             0,
                           );
                           return (
-                            <li key={hashtag.name}>
+                            <li key={`${name}-${total}`}>
                               <Link
                                 to={
                                   instance
-                                    ? `/${instance}/t/${hashtag.name}`
-                                    : `/t/${hashtag.name}`
+                                    ? `/${instance}/t/${name}`
+                                    : `/t/${name}`
                                 }
                               >
                                 <Icon icon="hashtag" />
-                                <span>{hashtag.name}</span>
+                                <span>{name}</span>
                                 {!!total && (
                                   <span class="count">
                                     {shortenNumber(total)}
@@ -282,7 +348,9 @@ function Search(props) {
                         <div class="ui-state">
                           <Link
                             class="plain button"
-                            to={`/search?q=${q}&type=hashtags`}
+                            to={`/search?q=${encodeURIComponent(
+                              q,
+                            )}&type=hashtags`}
                           >
                             See more hashtags <Icon icon="arrow-right" />
                           </Link>
@@ -304,7 +372,14 @@ function Search(props) {
               {(!type || type === 'statuses') && (
                 <>
                   {type !== 'statuses' && (
-                    <h2 class="timeline-header">Posts</h2>
+                    <h2 class="timeline-header">
+                      Posts{' '}
+                      <Link
+                        to={`/search?q=${encodeURIComponent(q)}&type=statuses`}
+                      >
+                        <Icon icon="arrow-right" size="l" />
+                      </Link>
+                    </h2>
                   )}
                   {statusResults.length > 0 ? (
                     <>
@@ -328,7 +403,9 @@ function Search(props) {
                         <div class="ui-state">
                           <Link
                             class="plain button"
-                            to={`/search?q=${q}&type=statuses`}
+                            to={`/search?q=${encodeURIComponent(
+                              q,
+                            )}&type=statuses`}
                           >
                             See more posts <Icon icon="arrow-right" />
                           </Link>

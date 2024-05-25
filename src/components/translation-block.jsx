@@ -10,21 +10,19 @@ import localeCode2Text from '../utils/localeCode2Text';
 import pmem from '../utils/pmem';
 
 import Icon from './icon';
+import LazyShazam from './lazy-shazam';
 import Loader from './loader';
+
+const { PHANPY_LINGVA_INSTANCES } = import.meta.env;
+const LINGVA_INSTANCES = PHANPY_LINGVA_INSTANCES
+  ? PHANPY_LINGVA_INSTANCES.split(/\s+/)
+  : [];
 
 const throttle = pThrottle({
   limit: 1,
   interval: 2000,
 });
 
-// Using other API instances instead of lingva.ml because of this bug (slashes don't work):
-// https://github.com/thedaviddelta/lingva-translate/issues/68
-const LINGVA_INSTANCES = [
-  'lingva.phanpy.social',
-  'lingva.lunar.icu',
-  'lingva.garudalinux.org',
-  'translate.plausibility.cloud',
-];
 let currentLingvaInstance = 0;
 
 function _lingvaTranslate(text, source, target) {
@@ -145,23 +143,21 @@ function TranslationBlock({
       detectedLang !== targetLangText
     ) {
       return (
-        <div class="shazam-container">
-          <div class="shazam-container-inner">
-            <div class="status-translation-block-mini">
-              <Icon
-                icon="translate"
-                alt={`Auto-translated from ${sourceLangText}`}
-              />
-              <output
-                lang={targetLang}
-                dir="auto"
-                title={pronunciationContent || ''}
-              >
-                {translatedContent}
-              </output>
-            </div>
+        <LazyShazam>
+          <div class="status-translation-block-mini">
+            <Icon
+              icon="translate"
+              alt={`Auto-translated from ${sourceLangText}`}
+            />
+            <output
+              lang={targetLang}
+              dir="auto"
+              title={pronunciationContent || ''}
+            >
+              {translatedContent}
+            </output>
           </div>
-        </div>
+        </LazyShazam>
       );
     }
     return null;
@@ -243,4 +239,4 @@ function TranslationBlock({
   );
 }
 
-export default TranslationBlock;
+export default LINGVA_INSTANCES?.length ? TranslationBlock : () => null;

@@ -14,7 +14,7 @@ import { subscribe } from 'valtio';
 
 import BackgroundService from './components/background-service';
 import ComposeButton from './components/compose-button';
-import { ICONS } from './components/icon';
+import { ICONS } from './components/ICONS';
 import KeyboardShortcutsHelp from './components/keyboard-shortcuts-help';
 import Loader from './components/loader';
 import Modals from './components/modals';
@@ -24,7 +24,9 @@ import Shortcuts from './components/shortcuts';
 import NotFound from './pages/404';
 import AccountStatuses from './pages/account-statuses';
 import Bookmarks from './pages/bookmarks';
+import Catchup from './pages/catchup';
 import Favourites from './pages/favourites';
+import Filters from './pages/filters';
 import FollowedHashtags from './pages/followed-hashtags';
 import Following from './pages/following';
 import Hashtag from './pages/hashtag';
@@ -51,7 +53,7 @@ import { getAccessToken } from './utils/auth';
 import focusDeck from './utils/focus-deck';
 import states, { initStates, statusKey } from './utils/states';
 import store from './utils/store';
-import { getCurrentAccount } from './utils/store-utils';
+import { getCurrentAccount, setCurrentAccountID } from './utils/store-utils';
 import './utils/toast-alert';
 
 window.__STATES__ = states;
@@ -124,11 +126,13 @@ setInterval(() => {
 // Related: https://github.com/vitejs/vite/issues/10600
 setTimeout(() => {
   for (const icon in ICONS) {
-    if (Array.isArray(ICONS[icon])) {
-      ICONS[icon][0]?.();
-    } else {
-      ICONS[icon]?.();
-    }
+    queueMicrotask(() => {
+      if (Array.isArray(ICONS[icon])) {
+        ICONS[icon][0]?.();
+      } else {
+        ICONS[icon]?.();
+      }
+    });
   }
 }, 5000);
 
@@ -187,6 +191,88 @@ setTimeout(() => {
   // );
 })();
 
+// Possible fix for iOS PWA theme-color bug
+// It changes when loading web pages in "webview"
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+if (isIOS) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const theme = store.local.get('theme');
+      let $meta;
+      if (theme) {
+        // Get current meta
+        $meta = document.querySelector(
+          `meta[name="theme-color"][data-theme-setting="manual"]`,
+        );
+        if ($meta) {
+          const color = $meta.content;
+          const tempColor =
+            theme === 'light'
+              ? $meta.dataset.themeLightColorTemp
+              : $meta.dataset.themeDarkColorTemp;
+          $meta.content = tempColor || '';
+          setTimeout(() => {
+            $meta.content = color;
+          }, 10);
+        }
+      } else {
+        // Get current color scheme
+        const colorScheme = window.matchMedia('(prefers-color-scheme: dark)')
+          .matches
+          ? 'dark'
+          : 'light';
+        // Get current theme-color
+        $meta = document.querySelector(
+          `meta[name="theme-color"][media*="${colorScheme}"]`,
+        );
+        if ($meta) {
+          const color = $meta.dataset.content;
+          const tempColor = $meta.dataset.contentTemp;
+          $meta.content = tempColor || '';
+          setTimeout(() => {
+            $meta.content = color;
+          }, 10);
+        }
+      }
+    }
+  });
+}
+
+{
+  const theme = store.local.get('theme');
+  // If there's a theme, it's NOT auto
+  if (theme) {
+    // dark | light
+    document.documentElement.classList.add(`is-${theme}`);
+    document
+      .querySelector('meta[name="color-scheme"]')
+      .setAttribute('content', theme || 'dark light');
+
+    // Enable manual theme <meta>
+    const $manualMeta = document.querySelector(
+      'meta[data-theme-setting="manual"]',
+    );
+    if ($manualMeta) {
+      $manualMeta.name = 'theme-color';
+      $manualMeta.content =
+        theme === 'light'
+          ? $manualMeta.dataset.themeLightColor
+          : $manualMeta.dataset.themeDarkColor;
+    }
+    // Disable auto theme <meta>s
+    const $autoMetas = document.querySelectorAll(
+      'meta[data-theme-setting="auto"]',
+    );
+    $autoMetas.forEach((m) => {
+      m.name = '';
+    });
+  }
+  const textSize = store.local.get('textSize');
+  if (textSize) {
+    document.documentElement.style.setProperty('--text-size', `${textSize}px`);
+  }
+}
+
 subscribe(states, (changes) => {
   for (const [action, path, value, prevValue] of changes) {
     // Change #app dataset based on settings.shortcutsViewMode
@@ -209,23 +295,6 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [uiState, setUIState] = useState('loading');
 
-  useLayoutEffect(() => {
-    const theme = store.local.get('theme');
-    if (theme) {
-      document.documentElement.classList.add(`is-${theme}`);
-      document
-        .querySelector('meta[name="color-scheme"]')
-        .setAttribute('content', theme === 'auto' ? 'dark light' : theme);
-    }
-    const textSize = store.local.get('textSize');
-    if (textSize) {
-      document.documentElement.style.setProperty(
-        '--text-size',
-        `${textSize}px`,
-      );
-    }
-  }, []);
-
   useEffect(() => {
     const instanceURL = store.local.get('instanceURL');
     const code = decodeURIComponent(
@@ -235,7 +304,11 @@ function App() {
     if (code) {
       console.log({ code });
       // Clear the code from the URL
-      window.history.replaceState({}, document.title, location.pathname || '/');
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname || '/',
+      );
 
       const clientID = store.session.get('clientID');
       const clientSecret = store.session.get('clientSecret');
@@ -265,7 +338,7 @@ function App() {
       window.__IGNORE_GET_ACCOUNT_ERROR__ = true;
       const account = getCurrentAccount();
       if (account) {
-        store.session.set('currentAccount', account.info.id);
+        setCurrentAccountID(account.info.id);
         const { client } = api({ account });
         const { instance } = client;
         // console.log('masto', masto);
@@ -323,7 +396,7 @@ function PrimaryRoutes({ isLoggedIn, loading }) {
   const location = useLocation();
   const nonRootLocation = useMemo(() => {
     const { pathname } = location;
-    return !/^\/(login|welcome)/.test(pathname);
+    return !/^\/(login|welcome)/i.test(pathname);
   }, [location]);
 
   return (
@@ -385,7 +458,9 @@ function SecondaryRoutes({ isLoggedIn }) {
             <Route index element={<Lists />} />
             <Route path=":id" element={<List />} />
           </Route>
-          <Route path="/ft" element={<FollowedHashtags />} />
+          <Route path="/fh" element={<FollowedHashtags />} />
+          <Route path="/ft" element={<Filters />} />
+          <Route path="/catchup" element={<Catchup />} />
         </>
       )}
       <Route path="/:instance?/t/:hashtag" element={<Hashtag />} />

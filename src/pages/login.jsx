@@ -1,7 +1,10 @@
 import './login.css';
 
+import Fuse from 'fuse.js';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useSearchParams } from 'react-router-dom';
+
+import logo from '../assets/logo.svg';
 
 import Link from '../components/link';
 import Loader from '../components/loader';
@@ -10,6 +13,8 @@ import { getAuthorizationURL, registerApplication } from '../utils/auth';
 import store from '../utils/store';
 import useTitle from '../utils/useTitle';
 
+const { PHANPY_DEFAULT_INSTANCE: DEFAULT_INSTANCE } = import.meta.env;
+
 function Login() {
   useTitle('Log in');
   const instanceURLRef = useRef();
@@ -17,17 +22,20 @@ function Login() {
   const [uiState, setUIState] = useState('default');
   const [searchParams] = useSearchParams();
   const instance = searchParams.get('instance');
+  const submit = searchParams.get('submit');
   const [instanceText, setInstanceText] = useState(
     instance || cachedInstanceURL?.toLowerCase() || '',
   );
 
   const [instancesList, setInstancesList] = useState([]);
+  const searcher = useRef();
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(instancesListURL);
         const data = await res.json();
         setInstancesList(data);
+        searcher.current = new Fuse(data);
       } catch (e) {
         // Silently fail
         console.error(e);
@@ -42,6 +50,7 @@ function Login() {
   // }, []);
 
   const submitInstance = (instanceURL) => {
+    if (!instanceURL) return;
     store.local.set('instanceURL', instanceURL);
 
     (async () => {
@@ -72,50 +81,64 @@ function Login() {
     })();
   };
 
+  const cleanInstanceText = instanceText
+    ? instanceText
+        .replace(/^https?:\/\//, '') // Remove protocol from instance URL
+        .replace(/\/+$/, '') // Remove trailing slash
+        .replace(/^@?[^@]+@/, '') // Remove @?acct@
+        .trim()
+    : null;
+  const instanceTextLooksLikeDomain =
+    /[^\s\r\n\t\/\\]+\.[^\s\r\n\t\/\\]+/.test(cleanInstanceText) &&
+    !/[\s\/\\@]/.test(cleanInstanceText);
+
+  const instancesSuggestions = cleanInstanceText
+    ? searcher.current
+        ?.search(cleanInstanceText, {
+          limit: 10,
+        })
+        ?.map((match) => match.item)
+    : [];
+
+  const selectedInstanceText = instanceTextLooksLikeDomain
+    ? cleanInstanceText
+    : instancesSuggestions?.length
+    ? instancesSuggestions[0]
+    : instanceText
+    ? instancesList.find((instance) => instance.includes(instanceText))
+    : null;
+
   const onSubmit = (e) => {
     e.preventDefault();
-    const { elements } = e.target;
-    let instanceURL = elements.instanceURL.value.toLowerCase();
-    // Remove protocol from instance URL
-    instanceURL = instanceURL.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    // Remove @acct@ or acct@ from instance URL
-    instanceURL = instanceURL.replace(/^@?[^@]+@/, '');
-    if (!/\./.test(instanceURL)) {
-      instanceURL = instancesList.find((instance) =>
-        instance.includes(instanceURL),
-      );
-    }
-    submitInstance(instanceURL);
+    // const { elements } = e.target;
+    // let instanceURL = elements.instanceURL.value.toLowerCase();
+    // // Remove protocol from instance URL
+    // instanceURL = instanceURL.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    // // Remove @acct@ or acct@ from instance URL
+    // instanceURL = instanceURL.replace(/^@?[^@]+@/, '');
+    // if (!/\./.test(instanceURL)) {
+    //   instanceURL = instancesList.find((instance) =>
+    //     instance.includes(instanceURL),
+    //   );
+    // }
+    // submitInstance(instanceURL);
+    submitInstance(selectedInstanceText);
   };
 
-  const instancesSuggestions = instanceText
-    ? instancesList
-        .filter((instance) => instance.includes(instanceText))
-        .sort((a, b) => {
-          // Move text that starts with instanceText to the start
-          const aStartsWith = a
-            .toLowerCase()
-            .startsWith(instanceText.toLowerCase());
-          const bStartsWith = b
-            .toLowerCase()
-            .startsWith(instanceText.toLowerCase());
-          if (aStartsWith && !bStartsWith) return -1;
-          if (!aStartsWith && bStartsWith) return 1;
-          return 0;
-        })
-        .slice(0, 10)
-    : [];
+  if (submit) {
+    useEffect(() => {
+      submitInstance(instance || selectedInstanceText);
+    }, []);
+  }
 
   return (
     <main id="login" style={{ textAlign: 'center' }}>
       <form onSubmit={onSubmit}>
-        <h1>Log in</h1>
-        <p>
-          You can use any Mastodon instance domain, but if you're not sure, sign up and use{' '}
-          <a onClick={() => setInstanceText('social.boom.army')}>
-            social.boom.army
-          </a>
-        </p>
+        <h1>
+          <img src={logo} alt="" width="80" height="80" />
+          <br />
+          Log in
+        </h1>
         <label>
           <p>Instance</p>
           <input
@@ -130,7 +153,7 @@ function Login() {
             autocorrect="off"
             autocapitalize="off"
             autocomplete="off"
-            spellcheck={false}
+            spellCheck={false}
             placeholder="instance domain"
             onInput={(e) => {
               setInstanceText(e.target.value);
@@ -138,11 +161,11 @@ function Login() {
           />
           {/* {instancesSuggestions?.length > 0 ? (
             <ul id="instances-suggestions">
-              {instancesSuggestions.map((instance) => (
+              {instancesSuggestions.map((instance, i) => (
                 <li>
                   <button
                     type="button"
-                    class="plain4"
+                    class="plain5"
                     onClick={() => {
                       submitInstance(instance);
                     }}
@@ -153,8 +176,8 @@ function Login() {
               ))}
             </ul>
           ) : (
-            <div id="instances-eg">e.g. &ldquo;mastodon.social&rsquo;</div>
-          )} */}
+            <div id="instances-eg">e.g. &ldquo;mastodon.social&rdquo;</div>
+          )}
           {/* <datalist id="instances-list">
             {instancesList.map((instance) => (
               <option value={instance} />
@@ -168,17 +191,25 @@ function Login() {
         )}
         <br />
         <div>
-          <button class="large" disabled={uiState === 'loading'}>
-            Log in
+          <button
+            disabled={
+              uiState === 'loading' || !instanceText || !selectedInstanceText
+            }
+          >
+            {selectedInstanceText
+              ? `Continue with ${selectedInstanceText}`
+              : 'Continue'}
           </button>{' '}
         </div>
         <Loader hidden={uiState !== 'loading'} />
         <hr />
-        <p>
-          <a href="https://social.boom.army/auth/sign_up" target="_blank">
-            Don't have an account? Create one!
-          </a>
-        </p>
+        {!DEFAULT_INSTANCE && (
+          <p>
+            <a href="https://social.boom.army/auth/sign_up" target="_blank">
+              Don't have an account? Create one!
+            </a>
+          </p>
+        )}
         <p>
           <Link to="/">Go home</Link>
         </p>

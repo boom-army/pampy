@@ -1,3 +1,8 @@
+import { api } from './api';
+import { extractTagsFromStatus, getFollowedTags } from './followed-tags';
+import pmem from './pmem';
+import { fetchRelationships } from './relationships';
+import states, { saveStatus, statusKey } from './states';
 import store from './store';
 
 export function groupBoosts(values) {
@@ -78,7 +83,7 @@ export function dedupeBoosts(items, instance) {
   return filteredItems;
 }
 
-export function groupContext(items) {
+export function groupContext(items, instance) {
   const contexts = [];
   let contextIndex = 0;
   items.forEach((item) => {
@@ -170,8 +175,91 @@ export function groupContext(items) {
         return;
       }
     }
+
+    if (item.inReplyToId && item.inReplyToAccountId !== item.account.id) {
+      const sKey = statusKey(item.id, instance);
+      if (!states.statusReply[sKey]) {
+        // If it's a reply and not a thread
+        queueMicrotask(async () => {
+          try {
+            const { masto } = api({ instance });
+            // const replyToStatus = await masto.v1.statuses
+            //   .$select(item.inReplyToId)
+            //   .fetch();
+            const replyToStatus = await fetchStatus(item.inReplyToId, masto);
+            saveStatus(replyToStatus, instance, {
+              skipThreading: true,
+              skipUnfurling: true,
+            });
+            states.statusReply[sKey] = {
+              id: replyToStatus.id,
+              instance,
+            };
+          } catch (e) {
+            // Silently fail
+            console.error(e);
+          }
+        });
+      }
+    }
+
     newItems.push(item);
   });
 
   return newItems;
+}
+
+const fetchStatus = pmem((statusID, masto) => {
+  return masto.v1.statuses.$select(statusID).fetch();
+});
+
+export async function assignFollowedTags(items, instance) {
+  const followedTags = await getFollowedTags(); // [{name: 'tag'}, {...}]
+  if (!followedTags.length) return;
+  const { statusFollowedTags } = states;
+  console.log('statusFollowedTags', statusFollowedTags);
+  const statusWithFollowedTags = [];
+  items.forEach((item) => {
+    if (item.reblog) return;
+    const { id, content, tags = [] } = item;
+    const sKey = statusKey(id, instance);
+    if (statusFollowedTags[sKey]?.length) return;
+    const extractedTags = extractTagsFromStatus(content);
+    if (!extractedTags.length && !tags.length) return;
+    const itemFollowedTags = followedTags.reduce((acc, tag) => {
+      if (
+        extractedTags.some((t) => t.toLowerCase() === tag.name.toLowerCase()) ||
+        tags.some((t) => t.name.toLowerCase() === tag.name.toLowerCase())
+      ) {
+        acc.push(tag.name);
+      }
+      return acc;
+    }, []);
+    if (itemFollowedTags.length) {
+      // statusFollowedTags[sKey] = itemFollowedTags;
+      statusWithFollowedTags.push({
+        item,
+        sKey,
+        followedTags: itemFollowedTags,
+      });
+    }
+  });
+
+  if (statusWithFollowedTags.length) {
+    const accounts = statusWithFollowedTags.map((s) => s.item.account);
+    const relationships = await fetchRelationships(accounts);
+    if (!relationships) return;
+
+    statusWithFollowedTags.forEach((s) => {
+      const { item, sKey, followedTags } = s;
+      const r = relationships[item.account.id];
+      if (r && !r.following) {
+        statusFollowedTags[sKey] = followedTags;
+      }
+    });
+  }
+}
+
+export function clearFollowedTagsState() {
+  states.statusFollowedTags = {};
 }
