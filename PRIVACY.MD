@@ -8,7 +8,7 @@ Boom is hosted on [AWS](https://aws.amazon.com/) as a static website. Read more 
 
 ## Translations
 
-Phanpy uses [Lingva API](https://github.com/cheeaun/lingva-api) and [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) as fallbacks for translating post content, profile bio and media description.
+Boom Army uses [Lingva API](https://github.com/cheeaun/lingva-api) and [Lingva Translate](https://github.com/thedaviddelta/lingva-translate) as fallbacks for translating post content, profile bio and media description.
 
 ## Error logging
 

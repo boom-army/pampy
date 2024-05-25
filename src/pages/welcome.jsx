@@ -46,7 +46,7 @@ function Welcome() {
           />
           <img src={logoText} alt="Boom" width="250" />
         </h1>
-          <p class="desc">A minimalistic opinionated Mastodon web client.</p>
+          <p class="desc">Decentralized Social Media for Solana Blockchain</p>
           <p>
             <Link
               to={
@@ -83,28 +83,27 @@ function Welcome() {
             </small>
           </p>
         )}
-        {/* <p>
-          <a href="https://github.com/cheeaun/phanpy" target="_blank">
+        <p>
+          <a href="https://github.com/boom-army/panpy" target="_blank">
             Built
           </a>{' '}
           by{' '}
           <a
-            href="https://mastodon.social/@cheeaun"
+            href="https://boom.army/@harkl"
             target="_blank"
             onClick={(e) => {
               e.preventDefault();
-              states.showAccount = 'cheeaun@mastodon.social';
+              states.showAccount = 'harkl@social.boom.army';
             }}
           >
-            @cheeaun
+            @harkl
           </a>
           .{' '}
           <a href={PRIVACY_POLICY_URL} target="_blank">
             Privacy Policy
           </a>
           .
-        </p> */}
-        <p class="desc">Decentralized Social Media for Solana Blockchain</p>
+        </p>
       </div>
       <div id="why-container">
         <div class="sections">
